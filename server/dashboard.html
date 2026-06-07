@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crow Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:      #0a0a0a;
+  --surface: #111111;
+  --border:  #1e1e1e;
+  --border2: #2a2a2a;
+  --text:    #ccc;
+  --muted:   #555;
+  --green:   #22c55e;
+  --red:     #ef4444;
+  --yellow:  #facc15;
+  --blue:    #3b82f6;
+  --orange:  #f59e0b;
+}
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; min-height: 100vh; }
+a { color: inherit; text-decoration: none; }
+
+/* ── Nav ── */
+nav { display: flex; align-items: center; gap: 2px; padding: 10px 20px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 100; }
+.nav-brand { font-size: 11px; letter-spacing: 2px; color: var(--muted); margin-right: 20px; }
+.tab-btn { background: none; border: none; color: var(--muted); font: inherit; font-size: 12px; padding: 6px 14px; border-radius: 6px; cursor: pointer; letter-spacing: 0.5px; transition: background .15s, color .15s; }
+.tab-btn:hover  { background: var(--border); color: var(--text); }
+.tab-btn.active { background: var(--border2); color: #fff; }
+
+/* ── Layout ── */
+.page { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* ── Cards ── */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.card-label { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.card-value { font-size: 22px; font-weight: 700; }
+.card-value.green { color: var(--green); }
+.card-value.red   { color: var(--red); }
+.card-value.blue  { color: var(--blue); }
+
+/* ── Chart containers ── */
+.chart-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 20px; }
+.chart-title { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+.chart-wrap  { position: relative; }
+
+/* ── Table ── */
+.table-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+.table-header { padding: 12px 16px; font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 16px; text-align: left; }
+th { font-size: 10px; color: var(--muted); font-weight: 400; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+td { border-bottom: 1px solid var(--border); font-size: 12px; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #141414; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 10px; font-weight: 600; }
+.pill.win  { background: #14532d33; color: var(--green); }
+.pill.loss { background: #7f1d1d33; color: var(--red); }
+.pill.up   { background: #1e3a5f33; color: var(--blue); }
+.pill.down { background: #3b1f1f33; color: var(--orange); }
+
+/* ── Markets layout ── */
+#page-markets { padding: 0; max-width: none; overflow: hidden; }
+.mkt-header { padding: 10px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.market-detail { min-height: 200px; }
+.market-detail-empty { display: flex; align-items: center; justify-content: center;
+  height: 300px; color: var(--muted); font-size: 12px; }
+.mkt-detail-left  { padding: 16px; }
+.mkt-detail-right { padding: 16px; border-left: 1px solid var(--border); }
+@media (min-width: 900px) {
+  .mkt-detail-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .mkt-detail-right { position: sticky; top: 44px; max-height: calc(100vh - 44px); overflow-y: auto; }
+}
+@media (max-width: 900px) {
+  .mkt-detail-right { border-left: none; border-top: 1px solid var(--border); }
+}
+.market-stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.market-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px; }
+.market-stat-label { font-size: 9px; color: var(--muted); letter-spacing: 1px; margin-bottom: 3px; }
+.market-stat-value { font-size: 16px; font-weight: 700; }
+
+/* ── Analytics grid ── */
+.analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .analytics-grid { grid-template-columns: 1fr; } }
+
+/* ── Buttons ── */
+.action-btn { background:none;border:1px solid var(--border2);color:var(--muted);font:inherit;
+  font-size:11px;padding:4px 12px;border-radius:5px;cursor:pointer;transition:all .15s; }
+.action-btn:hover   { border-color:#555;color:var(--text); }
+.action-btn.primary { border-color:#3b82f6;color:#3b82f6; }
+.action-btn.primary:hover { background:#3b82f61a; }
+.action-btn.danger  { border-color:#ef4444;color:#ef4444; }
+.action-btn.danger:hover  { background:#ef44441a; }
+.action-btn.active  { border-color:var(--green);color:var(--green);background:#22c55e1a; }
+
+/* ── Config editor ── */
+.cfg-row { display:flex;justify-content:space-between;align-items:center;padding:4px 0; }
+.cfg-row label { font-size:11px;color:var(--muted); }
+.cfg-row input { width:80px;background:#0d0d0d;border:1px solid var(--border2);color:var(--text);
+  font:inherit;font-size:12px;padding:3px 8px;border-radius:5px;outline:none;text-align:right; }
+.cfg-row input:focus { border-color:#3b82f6; }
+.tb-input { width:100%;background:#0d0d0d;border:1px solid var(--border2);color:var(--text);
+  font:inherit;font-size:12px;padding:4px 6px;border-radius:5px;outline:none;text-align:center;cursor:pointer; }
+.tb-input:focus { border-color:#3b82f6; }
+
+/* ── Config list items ── */
+.config-item { padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s; }
+.config-item:last-child { border-bottom:none; }
+.config-item:hover    { background:#141414; }
+.config-item.selected { background:var(--border2); }
+.config-item-name   { font-size:12px;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:8px; }
+.config-item-stats  { font-size:10px;color:var(--muted); }
+.active-badge { font-size:9px;background:#22c55e22;color:var(--green);border:1px solid #22c55e44;
+  padding:1px 6px;border-radius:8px;font-weight:600;letter-spacing:0.5px; }
+
+/* ── Misc ── */
+.section-title { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 12px; }
+.empty { color: var(--muted); font-size: 12px; padding: 20px; text-align: center; }
+.ret-pos { color: var(--green); }
+.ret-neg { color: var(--red); }
+
+/* ── Tooltips ── */
+.tip { display:inline-flex;align-items:center;justify-content:center;
+  width:13px;height:13px;border-radius:50%;background:#1a1a1a;border:1px solid #2a2a2a;
+  color:#444;font-size:9px;font-weight:700;cursor:default;
+  margin-left:5px;position:relative;vertical-align:middle;flex-shrink:0; }
+.tip::after { content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;
+  transform:translateX(-50%);background:#161616;border:1px solid #2a2a2a;
+  color:#999;font-size:11px;font-weight:400;letter-spacing:0;line-height:1.5;
+  padding:7px 10px;border-radius:6px;width:210px;white-space:normal;text-align:left;
+  opacity:0;pointer-events:none;transition:opacity .15s;z-index:300; }
+.tip:hover { color:#888;border-color:#333; }
+.tip:hover::after { opacity:1; }
+
+/* ── Logout ── */
+.nav-logout { margin-left: auto; font-size: 10px; color: var(--muted); padding: 4px 10px;
+  border-radius: 4px; border: 1px solid transparent; white-space: nowrap; }
+.nav-logout:hover { color: var(--text); border-color: var(--border2); }
+
+/* ── Backtest ── */
+.bt-progress-bar  { height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:8px; }
+.bt-progress-fill { height:100%;background:var(--blue);border-radius:2px;transition:width .3s; }
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  nav { padding: 8px 12px; flex-wrap: wrap; gap: 4px; }
+  .tab-btn { padding: 5px 9px; font-size: 11px; }
+  .nav-logout { margin-left: 0; }
+  .page { padding: 12px; }
+  .cards { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin-bottom: 16px; }
+  .card { padding: 10px 12px; }
+  .card-value { font-size: 18px; }
+  .table-box { overflow-x: auto; }
+  th, td { padding: 7px 10px; }
+  .analytics-grid { grid-template-columns: 1fr; }
+  .mkt-detail-left { padding: 12px; }
+  .mkt-detail-right { padding: 12px; }
+  .cfg-layout { grid-template-columns: 1fr !important; }
+  .cfg-fields { grid-template-columns: 1fr !important; }
+  .cfg-editor-btns { flex-wrap: wrap; }
+  .cfg-row input { width: 100px; }
+  .market-stat-row { gap: 8px; }
+  .market-stat { padding: 6px 10px; }
+  .market-stat-value { font-size: 14px; }
+  .chart-wrap[style*="height:220px"] { height: 180px !important; }
+  .chart-wrap[style*="height:280px"] { height: 220px !important; }
+  .chart-wrap[style*="height:160px"] { height: 140px !important; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">◆ CROW</span>
+  <button class="tab-btn active" onclick="showTab('stats')">Stats</button>
+  <button class="tab-btn"        onclick="showTab('markets')">Markets</button>
+  <button class="tab-btn"        onclick="showTab('analytics')">Analytics</button>
+  <button class="tab-btn"        onclick="showTab('configs')">Configs</button>
+  <button class="tab-btn"        onclick="showTab('backtest')">Backtest</button>
+  <button class="tab-btn"        onclick="showTab('evo')">Evolution</button>
+  <a href="/logout" class="nav-logout">logout</a>
+</nav>
+
+<!-- ══ STATS ══════════════════════════════════════════════════ -->
+<div id="page-stats" class="page active">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="action-btn danger" onclick="clearTradeHistory()">Clear Trade History</button>
+  </div>
+  <div class="cards" id="stat-cards">
+    <div class="card"><div class="card-label">Trades</div><div class="card-value blue" id="s-total">—</div></div>
+    <div class="card"><div class="card-label">Wins</div><div class="card-value green" id="s-wins">—</div></div>
+    <div class="card"><div class="card-label">Losses</div><div class="card-value red" id="s-losses">—</div></div>
+    <div class="card"><div class="card-label">Win Rate</div><div class="card-value" id="s-winrate">—</div></div>
+    <div class="card"><div class="card-label">Total Return</div><div class="card-value" id="s-return">—</div></div>
+    <div class="card"><div class="card-label">Markets</div><div class="card-value" id="s-markets">—</div></div>
+    <div class="card"><div class="card-label">Ticks Logged</div><div class="card-value" id="s-ticks">—</div></div>
+  </div>
+
+  <div class="chart-box">
+    <div class="chart-title">Cumulative Return</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="chart-cumulative"></canvas></div>
+  </div>
+
+  <div class="table-box">
+    <div class="table-header">Recent Trades</div>
+    <table>
+      <thead><tr>
+        <th>Market</th><th>Side</th><th>Result</th>
+        <th>Entry</th><th>Exit</th><th>Return</th>
+        <th>Entry ΔL</th><th>Entry Secs</th><th>Entry Score</th>
+      </tr></thead>
+      <tbody id="recent-trades-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══ MARKETS ════════════════════════════════════════════════ -->
+<div id="page-markets" class="page">
+  <div class="mkt-header">
+    <select id="tb-month" class="tb-input" style="width:64px" oninput="updateTickerPreview()">
+      <option>JAN</option><option>FEB</option><option>MAR</option><option>APR</option>
+      <option>MAY</option><option>JUN</option><option>JUL</option><option>AUG</option>
+      <option>SEP</option><option>OCT</option><option>NOV</option><option>DEC</option>
+    </select>
+    <input id="tb-day"  class="tb-input" type="number" min="1" max="31" style="width:40px" title="Day"
+      oninput="updateTickerPreview()" onkeydown="if(event.key==='Enter')loadFromBuilder()">
+    <input id="tb-year" class="tb-input" type="number" min="2025" max="2035" style="width:56px" title="Year"
+      oninput="updateTickerPreview()" onkeydown="if(event.key==='Enter')loadFromBuilder()">
+    <input id="tb-hour" class="tb-input" type="number" min="0" max="23" style="width:42px" title="Hour (ET)"
+      oninput="updateTickerPreview()" onkeydown="if(event.key==='Enter')loadFromBuilder()">
+    <select id="tb-min" class="tb-input" style="width:54px" oninput="updateTickerPreview()">
+      <option>00</option><option>15</option><option>30</option><option>45</option>
+    </select>
+    <button class="action-btn" onclick="stepTime(-1)" title="Previous market">←</button>
+    <button class="action-btn primary" onclick="loadFromBuilder()">Load</button>
+    <button class="action-btn" onclick="stepTime(1)" title="Next market">→</button>
+    <button class="action-btn" onclick="loadRandomMarket()" title="Random market">?</button>
+    <span id="tb-preview" style="font-size:10px;color:var(--muted);margin-left:4px"></span>
+  </div>
+  <div class="market-detail" id="market-detail">
+    <div class="market-detail-empty">Select a market</div>
+  </div>
+</div>
+
+<!-- ══ CONFIGS ════════════════════════════════════════════════ -->
+<div id="page-configs" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px">CONFIGS</div>
+    <button class="action-btn" onclick="newConfig()">+ New Crow</button>
+  </div>
+  <div class="cfg-layout" style="display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start">
+
+    <!-- List -->
+    <div class="table-box" id="config-list" style="overflow:visible">
+      <div class="empty">No configs yet</div>
+    </div>
+
+    <!-- Editor -->
+    <div id="config-editor" style="display:none">
+      <div class="chart-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <input id="cfg-name" placeholder="Crow-N" style="background:none;border:none;color:#eee;
+            font-family:inherit;font-size:15px;font-weight:600;outline:none;width:160px" />
+          <div class="cfg-editor-btns" style="display:flex;gap:8px">
+            <button class="action-btn" id="cfg-activate-btn" onclick="activateConfig()">Set Active</button>
+            <button class="action-btn" onclick="duplicateConfig()">Duplicate</button>
+            <button class="action-btn danger" onclick="deleteConfig()">Delete</button>
+            <button class="action-btn primary" id="cfg-save-btn" onclick="saveConfig()">Save</button>
+          </div>
+        </div>
+
+        <!-- Formula -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            FORMULA
+            <span class="tip" data-tip="JS expression evaluated each tick. Return a positive score to go Up, negative to go Down. Variables: deltaLong, deltaShort, gapDelta, secsRemaining, lookback, gap, btc, up, down. Functions: abs(), max(), min(), round(), floor(), ceil().">?</span>
+          </div>
+          <textarea id="cfg-formula" rows="2" style="width:100%;background:#0d0d0d;border:1px solid var(--border2);
+            color:#facc15;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;
+            padding:8px 10px;border-radius:6px;outline:none;resize:vertical;line-height:1.6"></textarea>
+        </div>
+
+        <!-- Regime Filter -->
+        <div style="margin-bottom:16px">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            REGIME FILTER
+            <span class="tip" data-tip="Optional expression evaluated each tick. Entries are blocked when fewer than half the ticks in the lookback window pass this condition. Operates independently of score/last_score. Leave blank to disable.">?</span>
+          </div>
+          <textarea id="cfg-regime_filter" rows="1" placeholder="e.g. deltaLong * deltaShort >= 0"
+            style="width:100%;background:#0d0d0d;border:1px solid var(--border2);
+            color:#7dd3fc;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;
+            padding:8px 10px;border-radius:6px;outline:none;resize:vertical;line-height:1.6"></textarea>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+            <label style="font-size:11px;color:var(--muted)">Lookback (ticks)</label>
+            <input id="cfg-regime_lookback" type="number" step="1" min="1" placeholder="1"
+              style="width:72px;background:#0d0d0d;border:1px solid var(--border2);color:#7dd3fc;
+              font-family:inherit;font-size:12px;padding:4px 8px;border-radius:4px;outline:none">
+            <label style="font-size:11px;color:var(--muted)">Offset (ticks)</label>
+            <input id="cfg-regime_offset" type="number" step="1" min="0" placeholder="0"
+              style="width:72px;background:#0d0d0d;border:1px solid var(--border2);color:#7dd3fc;
+              font-family:inherit;font-size:12px;padding:4px 8px;border-radius:4px;outline:none">
+            <span style="font-size:11px;color:var(--muted)">offset=300 → assess at trading window start</span>
+          </div>
+        </div>
+
+        <!-- Fields grid -->
+        <div class="cfg-fields" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px">
+          <div class="cfg-row"><label>Trade Amount ($) <span class="tip" data-tip="Dollar amount placed per trade.">?</span></label><input id="cfg-trade_amount" type="number" step="0.5" min="0.5"></div>
+          <div class="cfg-row"><label>Live Trading <span class="tip" data-tip="LIVE executes real orders on Kalshi. PAPER only simulates trades locally. Requires an active server connection to enable.">?</span></label>
+            <button id="cfg-live-btn" onclick="toggleCfgLive()" style="padding:3px 12px;border-radius:4px;
+              font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;border:1px solid;letter-spacing:1px">PAPER</button>
+          </div>
+          <div class="cfg-row"><label>Entry Threshold <span class="tip" data-tip="The score must cross this magnitude (±) to open a position. Higher = less frequent entries.">?</span></label><input id="cfg-threshold" type="number" step="0.01"></div>
+          <div class="cfg-row"><label>Exit Threshold <span class="tip" data-tip="Score level that triggers an exit. 0 = exit on any sign reversal. Higher values require a stronger reversal before closing.">?</span></label><input id="cfg-exit_threshold" type="number" step="0.01"></div>
+          <div class="cfg-row"><label>Δshort Lookback (s) <span class="tip" data-tip="Seconds of BTC price history used to compute deltaShort (short-term momentum). Shorter = more reactive, noisier.">?</span></label><input id="cfg-short_lookback" type="number" step="1" min="1"></div>
+          <div class="cfg-row"><label>Cooldown (s) <span class="tip" data-tip="Seconds after the UI is ready before the bot can place its first trade. Lets the score stabilize before trading.">?</span></label><input id="cfg-cooldown" type="number" step="1" min="0"></div>
+          <div class="cfg-row"><label>Exit Cooldown (s) <span class="tip" data-tip="Seconds to wait after closing a position before the bot can enter a new one. Prevents immediately re-entering after a stop.">?</span></label><input id="cfg-exit_cooldown" type="number" step="1" min="0"></div>
+          <div class="cfg-row"><label>Loss Limit (%) <span class="tip" data-tip="If the cumulative return for this market session falls below this %, block all new entries. 0 = disabled.">?</span></label><input id="cfg-loss_limit" type="number" step="1" min="0"></div>
+          <div class="cfg-row"><label>Sell Limit (¢) <span class="tip" data-tip="Exit the position immediately if the contract price reaches this value. Acts as a take-profit ceiling. 0 = disabled.">?</span></label><input id="cfg-sell_limit" type="number" step="1" min="0"></div>
+          <div class="cfg-row"><label>Stop Loss (¢) <span class="tip" data-tip="Exit the position immediately if the contract price drops to or below this value. Acts as a price-based stop-loss floor. 0 = disabled.">?</span></label><input id="cfg-stop_loss" type="number" step="1" min="0"></div>
+          <div class="cfg-row"><label>Min Entry (¢) <span class="tip" data-tip="Only open a position if the contract price is at or above this value. Filters out very cheap (long-shot) contracts.">?</span></label><input id="cfg-min_entry" type="number" step="1" min="0"></div>
+          <div class="cfg-row"><label>Max Entry (¢) <span class="tip" data-tip="Only open a position if the contract price is at or below this value. Filters out contracts that are already heavily favored.">?</span></label><input id="cfg-max_entry" type="number" step="1" min="0"></div>
+        </div>
+
+        <!-- Notes -->
+        <div style="margin-top:16px">
+          <div style="font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px">NOTES</div>
+          <textarea id="cfg-notes" rows="3" placeholder="Observations, hypothesis, results…"
+            style="width:100%;background:#0d0d0d;border:1px solid var(--border2);color:var(--text);
+            font:inherit;font-size:12px;padding:8px 10px;border-radius:6px;outline:none;
+            resize:vertical;line-height:1.6"></textarea>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ ANALYTICS ══════════════════════════════════════════════ -->
+<div id="page-analytics" class="page">
+  <div class="analytics-grid">
+    <div class="chart-box">
+      <div class="chart-title">Return % vs ΔLong at Entry</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="chart-ret-dl"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Return % vs Secs Remaining at Entry</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="chart-ret-secs"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Score at Entry (wins vs losses)</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="chart-score-entry"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Return % vs Entry Price (¢)</div>
+      <div class="chart-wrap" style="height:280px"><canvas id="chart-ret-ep"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ BACKTEST ══════════════════════════════════════════════ -->
+<div id="page-backtest" class="page">
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:24px;flex-wrap:wrap">
+    <select id="bt-config"
+      style="background:#0d0d0d;border:1px solid #2a2a2a;color:#ccc;font:inherit;font-size:12px;
+             padding:4px 8px;border-radius:5px;outline:none;cursor:pointer;min-width:130px">
+      <option value="">Loading configs…</option>
+    </select>
+    <input id="bt-count" type="number" min="1" max="5000" value="30"
+      style="width:56px;background:#0d0d0d;border:1px solid #2a2a2a;color:#ccc;font:inherit;
+             font-size:12px;padding:4px 6px;border-radius:5px;outline:none;text-align:center">
+    <span style="font-size:10px;color:var(--muted)">markets</span>
+    <input id="bt-seed" type="text" placeholder="seed (optional)"
+      style="flex:1;min-width:140px;max-width:280px;background:#0d0d0d;border:1px solid #2a2a2a;
+             color:#aaa;font-family:monospace;font-size:11px;padding:4px 8px;border-radius:5px;outline:none"
+      title="Format: 2026-01-15T10:00:00-42  (cutoff timestamp – random seed)">
+    <button class="action-btn primary" onclick="startBacktest()">Run</button>
+  </div>
+  <div id="bt-results"></div>
+</div>
+
+<!-- ══ EVOLUTION ════════════════════════════════════════════ -->
+<div id="page-evo" class="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px">EVOLUTION ENGINE</div>
+    <div style="display:flex;gap:8px">
+      <button class="action-btn" onclick="refreshEvo()">Refresh</button>
+      <button class="action-btn" style="color:#f87171;border-color:#7f1d1d" onclick="startEvoReset()">Reset + Replay</button>
+    </div>
+  </div>
+
+  <!-- Reset modal -->
+  <div id="evo-reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:#0f0f14;border:1px solid #333;border-radius:10px;padding:24px;width:720px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:10px;color:var(--muted);letter-spacing:1.5px">RESET + REPLAY</div>
+        <span id="evo-reset-badge" style="font-size:10px;padding:2px 8px;border-radius:4px;background:#1e293b;color:#94a3b8">running…</span>
+      </div>
+      <pre id="evo-reset-log" style="font-size:11px;line-height:1.6;color:#94a3b8;background:#0a0a0f;border:1px solid #1e1e1e;border-radius:6px;padding:12px;overflow-y:auto;flex:1;min-height:320px;max-height:55vh;white-space:pre-wrap;word-break:break-all"></pre>
+      <div style="display:flex;justify-content:flex-end">
+        <button id="evo-reset-close" class="action-btn" onclick="closeEvoReset()" disabled style="opacity:0.4">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="cards" style="margin-bottom:20px">
+    <div class="card"><div class="card-label">Generation</div><div class="card-value blue" id="evo-gen">—</div></div>
+    <div class="card"><div class="card-label">Population</div><div class="card-value" id="evo-pop">—</div></div>
+    <div class="card"><div class="card-label">Valid</div><div class="card-value" id="evo-valid">—</div></div>
+    <div class="card"><div class="card-label">Best Fitness</div><div class="card-value green" id="evo-best-fit">—</div></div>
+    <div class="card"><div class="card-label">Best n</div><div class="card-value" id="evo-best-n">—</div></div>
+    <div class="card"><div class="card-label">Best WR</div><div class="card-value" id="evo-best-wr">—</div></div>
+    <div class="card"><div class="card-label">Best Avg</div><div class="card-value" id="evo-best-avg">—</div></div>
+  </div>
+
+  <div class="chart-box" id="evo-champion-box" style="display:none;margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:1px;flex-shrink:0">EVO-CHAMPION</div>
+      <div id="evo-champ-badge"></div>
+      <div id="evo-champ-stats" style="font-size:11px;color:var(--muted);margin-left:4px"></div>
+      <button class="action-btn" style="margin-left:auto;font-size:10px" onclick="goToEvoChampion()">Edit Config ↗</button>
+    </div>
+    <div id="evo-champ-formula" style="font-family:'Cascadia Code','Consolas',monospace;font-size:11px;color:#facc15;word-break:break-all;line-height:1.6"></div>
+  </div>
+
+  <div class="chart-box" id="evo-sim-box" style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div style="font-size:10px;color:var(--muted);letter-spacing:1px">PAPER SIM</div>
+      <div id="evo-sim-status" style="font-size:10px;color:var(--muted)">each market traded by whoever was champion when it ended</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:14px">
+      <div class="card"><div class="card-label">Trades</div><div class="card-value blue" id="evo-sim-n">—</div></div>
+      <div class="card"><div class="card-label">Win Rate</div><div class="card-value" id="evo-sim-wr">—</div></div>
+      <div class="card"><div class="card-label">Avg / Trade</div><div class="card-value" id="evo-sim-avg">—</div></div>
+      <div class="card"><div class="card-label">Total Return</div><div class="card-value" id="evo-sim-total">—</div></div>
+    </div>
+    <div class="chart-wrap" style="height:160px"><canvas id="chart-evo-sim"></canvas></div>
+    <div style="max-height:240px;overflow-y:auto;margin-top:12px">
+      <table>
+        <thead><tr>
+          <th>Market</th><th>Side</th><th>Entry</th><th>Exit</th><th>Return</th>
+        </tr></thead>
+        <tbody id="evo-sim-trades-body"><tr><td colspan="5" class="empty">—</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chart-box" style="margin-bottom:20px">
+    <div class="chart-title">Best Fitness Over Generations</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="chart-evo-fitness"></canvas></div>
+  </div>
+
+  <div class="table-box">
+    <div class="table-header">Population — alive genomes, sorted by fitness</div>
+    <div style="max-height:480px;overflow-y:auto">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Fitness</th><th>n</th><th>WR%</th><th>Avg%</th>
+          <th>Gen</th><th>RSI</th><th>Formula</th>
+        </tr></thead>
+        <tbody id="evo-pop-body"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────
+const BASE = '';
+const CHART_DEFAULTS = {
+  color: '#666',
+  borderColor: '#1e1e1e',
+  backgroundColor: 'transparent',
+};
+Chart.defaults.color          = '#666';
+Chart.defaults.borderColor    = '#1e1e1e';
+Chart.defaults.font.family    = 'Segoe UI, system-ui, sans-serif';
+Chart.defaults.font.size      = 11;
+
+// ── Helpers ───────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const api = path => fetch(BASE + path).then(r => r.json());
+const fmt1 = v => v == null ? '—' : v.toFixed(1);
+const fmt2 = v => v == null ? '—' : v.toFixed(2);
+const fmtPct = v => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+const retClass = v => v == null ? '' : (v >= 0 ? 'ret-pos' : 'ret-neg');
+const tickerLabel = t => t ? t.replace('KXBTC15M-', '').replace(/-\d+$/, '') : '—';
+
+function makeChart(id, type, data, options = {}) {
+  const ctx = $(id).getContext('2d');
+  return new Chart(ctx, {
+    type,
+    data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: { legend: { display: false }, tooltip: { ...tooltipStyle() } },
+      scales: {
+        x: { grid: { color: '#141414' }, ticks: { color: '#555' } },
+        y: { grid: { color: '#141414' }, ticks: { color: '#555' } },
+      },
+      ...options,
+    },
+  });
+}
+
+function tooltipStyle() {
+  return {
+    backgroundColor: '#1a1a1a',
+    borderColor: '#333',
+    borderWidth: 1,
+    titleColor: '#aaa',
+    bodyColor: '#ccc',
+    padding: 8,
+  };
+}
+
+// ── Tab switching ─────────────────────────────────────────────
+const TAB_ORDER = ['stats','markets','analytics','configs','backtest','evo'];
+const tabs = {};
+function showTab(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  $('page-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn')[TAB_ORDER.indexOf(name)].classList.add('active');
+  if (!tabs[name]) {
+    if (name === 'stats')     loadStats();
+    if (name === 'markets')   initTickerBuilder();
+    if (name === 'analytics') loadAnalytics();
+    if (name === 'configs')   loadConfigs();
+    if (name === 'backtest')  initBacktest();
+    if (name === 'evo')       loadEvo();
+    tabs[name] = true;
+  }
+}
+
+// ── Stats ─────────────────────────────────────────────────────
+async function clearTradeHistory() {
+  if (!confirm('Delete all trade history? Ticks and markets are untouched.')) return;
+  await fetch('/api/trades/clear', { method: 'POST' });
+  loadStats();
+}
+
+let cumulativeChart = null;
+async function loadStats() {
+  const d = await api('/api/stats');
+
+  $('s-total').textContent   = d.total;
+  $('s-wins').textContent    = d.wins;
+  $('s-losses').textContent  = d.losses;
+  $('s-winrate').textContent = d.win_rate + '%';
+  $('s-winrate').className   = 'card-value ' + (d.win_rate >= 50 ? 'green' : 'red');
+  $('s-return').textContent  = fmtPct(d.total_return);
+  $('s-return').className    = 'card-value ' + (d.total_return >= 0 ? 'green' : 'red');
+  $('s-markets').textContent = d.markets;
+  $('s-ticks').textContent   = d.ticks.toLocaleString();
+
+  // Cumulative chart
+  if (cumulativeChart) cumulativeChart.destroy();
+  cumulativeChart = makeChart('chart-cumulative', 'line', {
+    labels: d.cumulative.map(p => p.ts ? p.ts.slice(11, 16) : ''),
+    datasets: [{
+      data:            d.cumulative.map(p => p.value),
+      borderColor:     '#3b82f6',
+      borderWidth:     2,
+      pointRadius:     0,
+      fill:            { target: 'origin', above: '#3b82f61a', below: '#ef44441a' },
+    }],
+  }, {
+    scales: {
+      x: { ticks: { maxTicksLimit: 10, color: '#555' }, grid: { color: '#141414' } },
+      y: { ticks: { color: '#555', callback: v => v.toFixed(1) + '%' }, grid: { color: '#141414' } },
+    },
+  });
+
+  // Recent trades table
+  const tbody = $('recent-trades-body');
+  if (!d.recent.length) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty">No trades yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = d.recent.map(t => {
+    const ret = t.entry_price ? (t.exit_price / t.entry_price - 1) * 100 : null;
+    return `<tr>
+      <td style="color:#666;font-size:11px">${tickerLabel(t.market_ticker)}</td>
+      <td><span class="pill ${t.side?.toLowerCase()}">${t.side ?? '—'}</span></td>
+      <td><span class="pill ${t.result}">${t.result ?? '—'}</span></td>
+      <td>${fmt1(t.entry_price)}¢</td>
+      <td>${fmt1(t.exit_price)}¢</td>
+      <td class="${retClass(ret)}">${fmtPct(ret)}</td>
+      <td>${t.entry_delta_long != null ? (t.entry_delta_long >= 0 ? '+' : '') + Math.round(t.entry_delta_long) : '—'}</td>
+      <td>${t.entry_secs_remaining ?? '—'}s</td>
+      <td>${t.entry_score != null ? t.entry_score.toFixed(3) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Markets ───────────────────────────────────────────────────
+let mktBtcChart   = null;
+let mktPriceChart = null;
+let simScoreChart = null;
+let simTicker     = null;
+let simTicks      = null;
+let simConfigs    = [];
+let simConfigId   = null;
+
+function fitChartHeights() {
+  if (window.innerWidth < 900) return;
+  const left = document.querySelector('.mkt-detail-left');
+  if (!left) return;
+  const boxes  = [...left.querySelectorAll('.chart-box')];
+  if (!boxes.length) return;
+
+  const navH   = document.querySelector('nav')?.offsetHeight          ?? 44;
+  const hdrH   = document.querySelector('.mkt-header')?.offsetHeight  ?? 46;
+  const statsH = (left.querySelector('.market-stat-row')?.offsetHeight ?? 52) + 16;
+  const padV   = 32;  // mkt-detail-left: 16px top + 16px bottom padding
+  const boxOvh = 60;  // per chart-box: padding(32) + title+margin(26) + border(2)
+  const gapH   = (boxes.length - 1) * 20;
+
+  const h = Math.max(80, Math.floor(
+    (window.innerHeight - navH - hdrH - padV - statsH - boxes.length * boxOvh - gapH) / boxes.length
+  ));
+
+  boxes.forEach(b => { const w = b.querySelector('.chart-wrap'); if (w) w.style.height = h + 'px'; });
+
+  const rw = document.querySelector('#sim-score-canvas')?.closest('.chart-wrap');
+  if (rw) rw.style.height = h + 'px';
+
+  [mktBtcChart, mktPriceChart, simScoreChart].forEach(c => c?.resize());
+}
+window.addEventListener('resize', () => { clearTimeout(window._fitT); window._fitT = setTimeout(fitChartHeights, 100); });
+
+function cfgSelectHtml() {
+  if (!simConfigs.length) return '<span style="font-size:11px;color:var(--muted)">No configs yet</span>';
+  const sel = simConfigId ?? simConfigs.find(c => c.active)?.id ?? simConfigs[0]?.id;
+  return `<div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <select id="sim-cfg-select" style="background:#0d0d0d;border:1px solid #2a2a2a;color:#ccc;
+      font:inherit;font-size:11px;padding:4px 8px;border-radius:5px;outline:none;cursor:pointer">
+      ${simConfigs.map(c => `<option value="${c.id}"${c.id == sel ? ' selected' : ''}>${c.name}${c.active ? ' ★' : ''}</option>`).join('')}
+    </select>
+    <button class="action-btn primary" id="sim-run-btn" onclick="runSimulation()">Run</button>
+  </div>`;
+}
+
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const SLOT_MS = 15 * 60 * 1000;
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function builderTicker() {
+  const yy  = String($('tb-year').value).slice(-2);
+  const mmm = $('tb-month').value;
+  const dd  = pad2(Number($('tb-day').value));
+  const hh  = pad2(Number($('tb-hour').value));
+  const mm  = $('tb-min').value;
+  return `KXBTC15M-${yy}${mmm}${dd}${hh}${mm}-15`;
+}
+function updateTickerPreview() {
+  const el = $('tb-preview');
+  if (el) el.textContent = builderTicker();
+}
+function setBuilderFromLocal(dt) {
+  $('tb-year').value  = dt.getFullYear();
+  $('tb-month').value = MONTHS[dt.getMonth()];
+  $('tb-day').value   = dt.getDate();
+  $('tb-hour').value  = pad2(dt.getHours());
+  $('tb-min').value   = pad2(dt.getMinutes());
+  updateTickerPreview();
+}
+function stepTime(delta) {
+  const d = new Date(
+    Number($('tb-year').value),
+    MONTHS.indexOf($('tb-month').value),
+    Number($('tb-day').value),
+    Number($('tb-hour').value),
+    Number($('tb-min').value)
+  );
+  d.setTime(d.getTime() + delta * SLOT_MS);
+  setBuilderFromLocal(d);
+}
+async function loadRandomMarket() {
+  const markets = await api('/api/markets');
+  if (!markets.length) return;
+  const m = markets[Math.floor(Math.random() * markets.length)];
+  const t = m.market_ticker.replace('KXBTC15M-', '').replace(/-\d+$/, '');
+  $('tb-year').value  = 2000 + Number(t.slice(0, 2));
+  $('tb-month').value = t.slice(2, 5);
+  $('tb-day').value   = Number(t.slice(5, 7));
+  $('tb-hour').value  = t.slice(7, 9);
+  $('tb-min').value   = t.slice(9, 11);
+  updateTickerPreview();
+  loadMarketDetail(m.market_ticker);
+}
+function loadFromBuilder() { loadMarketDetail(builderTicker()); }
+function initTickerBuilder() {
+  const now  = new Date();
+  const mins = Math.floor(now.getMinutes() / 15) * 15;
+  const slot = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), mins);
+  slot.setTime(slot.getTime() - SLOT_MS);
+  setBuilderFromLocal(slot);
+  loadFromBuilder();
+}
+
+async function loadMarketDetail(ticker) {
+  simTicker = ticker;
+
+  [mktBtcChart, mktPriceChart, simScoreChart].forEach(c => { if (c) c.destroy(); });
+  mktBtcChart = mktPriceChart = simScoreChart = null;
+
+  const [ticks, configs] = await Promise.all([
+    api('/api/markets/' + encodeURIComponent(ticker) + '/ticks'),
+    api('/api/configs').catch(() => []),
+  ]);
+  simTicks   = ticks;
+  simConfigs = configs;
+  simConfigId = simConfigId ?? configs.find(c => c.active)?.id ?? configs[0]?.id ?? null;
+
+  const targetPrice = ticks.find(t => t.target_price != null)?.target_price;
+  const dateStr = ticks[0]?.ts ? ticks[0].ts.slice(0, 16).replace('T', ' ') + ' UTC' : '—';
+  const n = ticks.length;
+  const xMinAxis = { type: 'linear', display: true, grid: { color: '#141414' },
+    ticks: { color: '#555', callback: v => Math.round((n - 1 - v) / 60) + 'm', maxTicksLimit: 6 } };
+
+  $('market-detail').innerHTML = `
+    <div class="mkt-detail-grid">
+      <div class="mkt-detail-left">
+        <div class="market-stat-row" style="margin-bottom:16px">
+          <div class="market-stat">
+            <div class="market-stat-label">Ticks</div>
+            <div class="market-stat-value">${ticks.length}</div>
+          </div>
+          <div class="market-stat">
+            <div class="market-stat-label">Strike</div>
+            <div class="market-stat-value" style="font-size:14px">
+              ${targetPrice != null ? '$' + Math.round(targetPrice).toLocaleString() : '—'}
+            </div>
+          </div>
+          <div class="market-stat">
+            <div class="market-stat-label">Started</div>
+            <div class="market-stat-value" style="font-size:11px;color:#666">${dateStr}</div>
+          </div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-title">BTC Price</div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chart-mkt-btc"></canvas></div>
+        </div>
+
+        <div class="chart-box">
+          <div class="chart-title">UP / DOWN Prices (¢)</div>
+          <div class="chart-wrap" style="height:160px"><canvas id="chart-mkt-prices"></canvas></div>
+        </div>
+      </div>
+
+      <div class="mkt-detail-right">
+        <div id="sim-results"><div class="market-stat-row">${cfgSelectHtml()}</div></div>
+      </div>
+    </div>`;
+
+  // BTC + strike chart
+  mktBtcChart = new Chart($('chart-mkt-btc').getContext('2d'), {
+    data: {
+      datasets: [
+        { type: 'line', order: 2, data: ticks.map((t, i) => ({ x: i, y: t.btc })), borderColor: '#d1d5db',
+          borderWidth: 1.5, pointRadius: 0, fill: false, label: 'BTC', tension: 0.1 },
+        ...(targetPrice != null ? [{
+          type: 'line', order: 2,
+          data: [{ x: 0, y: targetPrice }, { x: n - 1, y: targetPrice }],
+          borderColor: '#374151', borderWidth: 1, borderDash: [4, 4], pointRadius: 0, fill: false, label: 'Strike',
+        }] : []),
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: true, labels: { color: '#555', boxWidth: 8, font: { size: 10 }, filter: i => !!i.text } }, tooltip: tooltipStyle() },
+      scales: {
+        x: xMinAxis,
+        y: { grid: { color: '#141414' }, ticks: { color: '#555', callback: v => '$' + Math.round(v / 1000) + 'k' } },
+      },
+    },
+  });
+
+  // UP / DOWN price chart
+  mktPriceChart = new Chart($('chart-mkt-prices').getContext('2d'), {
+    data: {
+      datasets: [
+        { type: 'line', order: 2, data: ticks.map((t, i) => ({ x: i, y: t.up })),
+          borderColor: '#3b82f6', borderWidth: 1.5, pointRadius: 0, fill: false, label: 'UP' },
+        { type: 'line', order: 2, data: ticks.map((t, i) => ({ x: i, y: t.down })),
+          borderColor: '#f59e0b', borderWidth: 1.5, pointRadius: 0, fill: false, label: 'DOWN' },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: true, labels: { color: '#555', boxWidth: 8, font: { size: 10 }, filter: i => !!i.text } }, tooltip: tooltipStyle() },
+      scales: {
+        x: xMinAxis,
+        y: { min: 0, max: 100, grid: { color: '#141414' }, ticks: { color: '#555', callback: v => v + '¢' } },
+      },
+    },
+  });
+  requestAnimationFrame(fitChartHeights);
+}
+
+async function runSimulation() {
+  const select = $('sim-cfg-select');
+  const btn    = $('sim-run-btn');
+  if (!select || !simTicker) return;
+  const configId = select.value;
+  if (!configId) return;
+  simConfigId = configId;
+  btn.textContent = '...';
+  btn.disabled = true;
+  try {
+    const result = await api('/api/markets/' + encodeURIComponent(simTicker) + '/simulate?config=' + configId);
+    if (result.error) throw new Error(result.error);
+    renderSimResults(result);
+  } catch(e) {
+    $('sim-results').innerHTML = `<div class="empty" style="color:var(--red)">${e.message}</div>`;
+  } finally {
+    btn.textContent = 'Run';
+    btn.disabled = false;
+  }
+}
+
+function renderSimResults(r) {
+  const div = $('sim-results');
+  if (!div) return;
+  if (simScoreChart) { simScoreChart.destroy(); simScoreChart = null; }
+
+  // Walk backwards from idx to find last non-null value for a tick field or score series
+  const lastTickVal = (idx, key) => {
+    for (let i = Math.min(idx, simTicks.length - 1); i >= 0; i--)
+      if (simTicks[i]?.[key] != null) return simTicks[i][key];
+    return null;
+  };
+  const lastScore = idx => {
+    for (let i = Math.min(idx, r.score_series.length - 1); i >= 0; i--)
+      if (r.score_series[i] != null) return r.score_series[i];
+    return null;
+  };
+
+  // Overlay entry/exit markers on BTC chart — color by trade side
+  if (mktBtcChart && simTicks) {
+    mktBtcChart.data.datasets = mktBtcChart.data.datasets.filter(d => !d._sim);
+    for (const side of ['Up', 'Down']) {
+      const col = side === 'Up' ? '#3b82f6' : '#f59e0b';
+      const ts  = r.trades.filter(t => t.side === side);
+      if (!ts.length) continue;
+      mktBtcChart.data.datasets.push(
+        { _sim: true, type: 'scatter', order: 1, label: side,
+          data: ts.map(t => ({ x: t.entry_tick, y: simTicks[t.entry_tick]?.btc })),
+          backgroundColor: col, pointStyle: 'triangle', radius: 7 },
+        { _sim: true, type: 'scatter', order: 1, label: '',
+          data: ts.map(t => ({ x: t.exit_tick,  y: simTicks[t.exit_tick]?.btc  })),
+          backgroundColor: col, pointStyle: 'triangle', rotation: 180, radius: 7 },
+      );
+    }
+    mktBtcChart.update();
+  }
+
+  // Overlay on UP/DOWN chart — color by result (green=win, red=loss) with connecting line
+  if (mktPriceChart && simTicks) {
+    mktPriceChart.data.datasets = mktPriceChart.data.datasets.filter(d => !d._sim);
+    const seenResult = new Set();
+    for (const t of r.trades) {
+      const col    = t.result === 'win' ? '#22c55e' : '#ef4444';
+      const lbl    = seenResult.has(t.result) ? '' : (seenResult.add(t.result), t.result === 'win' ? 'Win' : 'Loss');
+      const key    = t.side === 'Up' ? 'up' : 'down';
+      const entryY = lastTickVal(t.entry_tick, key);
+      const exitY  = lastTickVal(t.exit_tick,  key);
+      mktPriceChart.data.datasets.push(
+        { _sim: true, type: 'line', order: 1, label: lbl,
+          data: [{ x: t.entry_tick, y: entryY }, { x: t.exit_tick, y: exitY }],
+          borderColor: col, borderWidth: 1.5, pointRadius: 0, fill: false, tension: 0 },
+        { _sim: true, type: 'scatter', order: 1, label: '',
+          data: [{ x: t.entry_tick, y: entryY }],
+          backgroundColor: col, pointStyle: 'triangle', radius: 7 },
+        { _sim: true, type: 'scatter', order: 1, label: '',
+          data: [{ x: t.exit_tick, y: exitY }],
+          backgroundColor: col, pointStyle: 'triangle', rotation: 180, radius: 7 },
+      );
+    }
+    mktPriceChart.update();
+  }
+
+  const noTrades = r.total === 0;
+  div.innerHTML = `
+    <div class="market-stat-row" style="margin-bottom:14px">
+      <div class="market-stat"><div class="market-stat-label">Trades</div>
+        <div class="market-stat-value">${r.total}</div></div>
+      <div class="market-stat"><div class="market-stat-label">W / L</div>
+        <div class="market-stat-value">${r.wins} / ${r.losses}</div></div>
+      <div class="market-stat"><div class="market-stat-label">Win Rate</div>
+        <div class="market-stat-value ${r.win_rate >= 50 ? 'ret-pos' : 'ret-neg'}">${r.win_rate}%</div></div>
+      <div class="market-stat"><div class="market-stat-label">Return</div>
+        <div class="market-stat-value ${r.total_return >= 0 ? 'ret-pos' : 'ret-neg'}">${fmtPct(r.total_return)}</div></div>
+      ${cfgSelectHtml()}
+    </div>
+    <div class="chart-box">
+      <div class="chart-title">Score</div>
+      <div class="chart-wrap" style="height:150px">
+        <canvas id="sim-score-canvas"></canvas>
+      </div>
+    </div>
+    ${noTrades ? '<div class="empty">No trades triggered with this config</div>' : `
+      <div class="table-box">
+        <div class="table-header">Simulated Trades</div>
+        <table>
+          <thead><tr>
+            <th>Side</th><th>Result</th><th>Entry (¢)</th><th>Exit (¢)</th><th>Return</th><th>Score</th>
+          </tr></thead>
+          <tbody>${r.trades.map(t => `
+            <tr>
+              <td><span class="pill ${t.side.toLowerCase()}">${t.side}</span></td>
+              <td><span class="pill ${t.result}">${t.result}</span></td>
+              <td>${fmt1(t.entry_price)}</td>
+              <td>${fmt1(t.exit_price)}</td>
+              <td class="${retClass(t.return_pct)}">${fmtPct(t.return_pct)}</td>
+              <td>${t.entry_score != null ? t.entry_score.toFixed(3) : '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`}`;
+
+  const scoreDatasets = [
+    { type: 'line', order: 2, data: r.score_series.map((y, x) => ({ x, y })), borderColor: '#a78bfa',
+      borderWidth: 1.5, pointRadius: 0, fill: false, label: 'Score' },
+  ];
+  for (const side of ['Up', 'Down']) {
+    const col = side === 'Up' ? '#3b82f6' : '#f59e0b';
+    const ts  = r.trades.filter(t => t.side === side);
+    if (!ts.length) continue;
+    scoreDatasets.push(
+      { type: 'scatter', order: 1, label: side,
+        data: ts.map(t => ({ x: t.entry_tick, y: r.score_series[t.entry_tick] })),
+        backgroundColor: col, pointStyle: 'triangle', radius: 7 },
+      { type: 'scatter', order: 1, label: '',
+        data: ts.map(t => ({ x: t.exit_tick, y: lastScore(t.exit_tick) })),
+        backgroundColor: col, pointStyle: 'triangle', rotation: 180, radius: 7 },
+    );
+  }
+  simScoreChart = new Chart($('sim-score-canvas').getContext('2d'), {
+    data: { datasets: scoreDatasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: { legend: { display: true, labels: { color: '#555', boxWidth: 8, font: { size: 10 }, filter: i => !!i.text } }, tooltip: tooltipStyle() },
+      scales: {
+        x: { type: 'linear', display: true, grid: { color: '#141414' },
+          ticks: { color: '#555', callback: v => Math.round((r.score_series.length - 1 - v) / 60) + 'm', maxTicksLimit: 6 } },
+        y: { grid: { color: '#141414' }, ticks: { color: '#555' } },
+      },
+    },
+  });
+  requestAnimationFrame(fitChartHeights);
+}
+
+// ── Analytics ─────────────────────────────────────────────────
+async function loadAnalytics() {
+  const trades = await api('/api/analytics/trades');
+  if (!trades.length) return;
+
+  const WIN_COLOR  = '#22c55e99';
+  const LOSS_COLOR = '#ef444499';
+  const scatterOpts = {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    plugins: { legend: { display: false }, tooltip: {
+      ...tooltipStyle(),
+      callbacks: { label: ctx => `${ctx.dataset.label} (${ctx.parsed.x.toFixed(1)}, ${ctx.parsed.y.toFixed(1)}%)` },
+    }},
+    scales: {
+      x: { grid: { color: '#141414' }, ticks: { color: '#555' } },
+      y: { grid: { color: '#141414' }, ticks: { color: '#555', callback: v => v.toFixed(0) + '%' } },
+    },
+  };
+
+  function splitDatasets(trades, xKey, yKey = 'return_pct') {
+    const wins  = trades.filter(t => t.result === 'win'  && t[xKey] != null && t[yKey] != null)
+                        .map(t => ({ x: t[xKey], y: t[yKey] }));
+    const losses = trades.filter(t => t.result === 'loss' && t[xKey] != null && t[yKey] != null)
+                         .map(t => ({ x: t[xKey], y: t[yKey] }));
+    return [
+      { label: 'Win',  data: wins,   backgroundColor: WIN_COLOR,  pointRadius: 6 },
+      { label: 'Loss', data: losses, backgroundColor: LOSS_COLOR, pointRadius: 6 },
+    ];
+  }
+
+  // Return vs ΔLong
+  makeChart('chart-ret-dl', 'scatter', { datasets: splitDatasets(trades, 'entry_delta_long') }, scatterOpts);
+
+  // Return vs secsRemaining
+  makeChart('chart-ret-secs', 'scatter', { datasets: splitDatasets(trades, 'entry_secs_remaining') }, {
+    ...scatterOpts,
+    scales: { ...scatterOpts.scales, x: { ...scatterOpts.scales.x, ticks: { color: '#555', callback: v => v + 's' } } },
+  });
+
+  // Score at entry — scatter (score vs return, colored by result)
+  makeChart('chart-score-entry', 'scatter', { datasets: splitDatasets(trades, 'entry_score') }, {
+    ...scatterOpts,
+    scales: { ...scatterOpts.scales, x: { ...scatterOpts.scales.x, ticks: { color: '#555', callback: v => v.toFixed(2) } } },
+  });
+
+  // Return vs entry price
+  makeChart('chart-ret-ep', 'scatter', { datasets: splitDatasets(trades, 'entry_price') }, {
+    ...scatterOpts,
+    scales: { ...scatterOpts.scales, x: { ...scatterOpts.scales.x, ticks: { color: '#555', callback: v => v + '¢' } } },
+  });
+}
+
+// ── Configs ───────────────────────────────────────────────────
+let allConfigs   = [];
+let editingCfg   = null;  // the config object currently in the editor
+let cfgLiveVal   = false;
+
+async function loadConfigs() {
+  allConfigs = await api('/api/configs');
+  renderConfigList();
+}
+
+function renderConfigList() {
+  const list = $('config-list');
+  if (!allConfigs.length) {
+    list.innerHTML = '<div class="empty">No configs yet — click "+ New Crow"</div>';
+    return;
+  }
+  list.innerHTML = allConfigs.map(c => `
+    <div class="config-item${editingCfg?.id === c.id ? ' selected' : ''}"
+         onclick="editConfig(${c.id})">
+      <div class="config-item-name">
+        ${c.name}
+        ${c.active ? '<span class="active-badge">ACTIVE</span>' : ''}
+      </div>
+      <div class="config-item-stats">
+        formula: <span style="color:#555;font-size:9px">${(c.formula||'').slice(0,40)}…</span>
+      </div>
+    </div>`).join('');
+}
+
+const CFG_FIELDS = [
+  'threshold','exit_threshold','short_lookback',
+  'cooldown','exit_cooldown','loss_limit','sell_limit','stop_loss',
+  'min_entry','max_entry','trade_amount','regime_lookback','regime_offset',
+];
+
+function populateEditor(c) {
+  editingCfg = c;
+  $('cfg-name').value           = c.name          || '';
+  $('cfg-formula').value        = c.formula       || '';
+  $('cfg-regime_filter').value  = c.regime_filter || '';
+  $('cfg-regime_offset').value  = c.regime_offset ?? '';
+  $('cfg-notes').value          = c.notes         || '';
+  cfgLiveVal = !!c.live_trading;
+  updateLiveBtn();
+  CFG_FIELDS.forEach(f => {
+    const el = $('cfg-' + f);
+    if (el) el.value = c[f] ?? '';
+  });
+  const activateBtn = $('cfg-activate-btn');
+  if (c.active) {
+    activateBtn.textContent = '✓ Active';
+    activateBtn.classList.add('active');
+    activateBtn.onclick = null;
+  } else {
+    activateBtn.textContent = 'Set Active';
+    activateBtn.classList.remove('active');
+    activateBtn.onclick = activateConfig;
+  }
+  $('config-editor').style.display = 'block';
+  renderConfigList();
+}
+
+function editConfig(id) {
+  const c = allConfigs.find(c => c.id === id);
+  if (c) populateEditor(c);
+}
+
+function updateLiveBtn() {
+  const btn = $('cfg-live-btn');
+  btn.textContent = cfgLiveVal ? 'LIVE' : 'PAPER';
+  btn.style.background    = cfgLiveVal ? '#22c55e22' : '#ef444422';
+  btn.style.borderColor   = cfgLiveVal ? '#22c55e'   : '#ef4444';
+  btn.style.color         = cfgLiveVal ? '#22c55e'   : '#ef4444';
+}
+
+function toggleCfgLive() { cfgLiveVal = !cfgLiveVal; updateLiveBtn(); }
+
+function collectForm() {
+  const rf = $('cfg-regime_filter').value.trim();
+  const d = {
+    name:          $('cfg-name').value.trim(),
+    formula:       $('cfg-formula').value.trim(),
+    regime_filter: rf || null,
+    notes:         $('cfg-notes').value,
+    live_trading:  cfgLiveVal ? 1 : 0,
+  };
+  CFG_FIELDS.forEach(f => {
+    const v = parseFloat($('cfg-' + f)?.value);
+    if (!isNaN(v)) d[f] = v;
+  });
+  return d;
+}
+
+async function duplicateConfig() {
+  if (!editingCfg) return;
+  const parentName = editingCfg.name;
+  const d = collectForm();
+  delete d.name;                          // let server assign next Crow-N
+  d.notes = `Copy of ${parentName}`;
+  try {
+    const res = await fetch('/api/configs', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(d),
+    });
+    const c = await res.json();
+    if (!c || !c.id) throw new Error('Unexpected response: ' + JSON.stringify(c));
+    allConfigs = await api('/api/configs');
+    populateEditor(allConfigs.find(x => x.id === c.id) || c);
+    renderConfigList();
+  } catch(e) {
+    console.error('duplicateConfig failed:', e);
+    alert('Could not duplicate config: ' + e.message);
+  }
+}
+
+async function newConfig() {
+  try {
+    const res = await fetch('/api/configs', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({}),
+    });
+    const c = await res.json();
+    if (!c || !c.id) throw new Error('Unexpected response: ' + JSON.stringify(c));
+    allConfigs = await api('/api/configs');
+    const fresh = allConfigs.find(x => x.id === c.id) || c;
+    populateEditor(fresh);
+  } catch(e) {
+    console.error('newConfig failed:', e);
+    alert('Could not create config: ' + e.message);
+  }
+}
+
+async function saveConfig() {
+  if (!editingCfg) return;
+  const btn = $('cfg-save-btn');
+  try {
+    const d = collectForm();
+    const res = await fetch('/api/configs/' + editingCfg.id, {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(d),
+    });
+    const updated = await res.json();
+    if (!updated || !updated.id) throw new Error('Unexpected response');
+    allConfigs = await api('/api/configs');
+    populateEditor(allConfigs.find(c => c.id === updated.id) || updated);
+    if (btn) {
+      btn.textContent = 'Saved!';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => {
+        btn.textContent = 'Save';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 2000);
+    }
+  } catch(e) {
+    console.error('saveConfig failed:', e);
+    alert('Could not save config: ' + e.message);
+  }
+}
+
+async function activateConfig() {
+  if (!editingCfg) return;
+  await fetch('/api/configs/' + editingCfg.id + '/activate', { method: 'POST' });
+  allConfigs = await api('/api/configs');
+  const updated = allConfigs.find(c => c.id === editingCfg.id);
+  if (updated) populateEditor(updated);
+}
+
+async function deleteConfig() {
+  if (!editingCfg) return;
+  const c = allConfigs.find(c => c.id === editingCfg.id);
+  if (c?.active) { alert('Cannot delete the active config.'); return; }
+  if (!confirm(`Delete "${editingCfg.name}"?`)) return;
+  await fetch('/api/configs/' + editingCfg.id, { method: 'DELETE' });
+  allConfigs = allConfigs.filter(c => c.id !== editingCfg.id);
+  editingCfg = null;
+  $('config-editor').style.display = 'none';
+  renderConfigList();
+}
+
+// ── Backtest ──────────────────────────────────────────────────
+let btChart     = null;
+let btJob       = null;
+let btPollTimer = null;
+let btTrades    = [];
+
+const BT_AXES = [
+  { v: 'trade_idx',            l: 'Trade #',           fmt: v => Math.round(v) },
+  { v: 'return_pct',           l: 'Return %',          fmt: v => v.toFixed(1) + '%' },
+  { v: 'cumulative',           l: 'Cumulative Return', fmt: v => v.toFixed(1) + '%' },
+  { v: 'entry_price',          l: 'Entry Price (¢)',   fmt: v => v.toFixed(0) + '¢' },
+  { v: 'exit_price',           l: 'Exit Price (¢)',    fmt: v => v.toFixed(0) + '¢' },
+  { v: 'entry_score',          l: 'Entry Score',       fmt: v => v.toFixed(2) },
+  { v: 'exit_score',           l: 'Exit Score',        fmt: v => v.toFixed(2) },
+  { v: 'entry_secs_remaining', l: 'Entry Secs',        fmt: v => v.toFixed(0) + 's' },
+  { v: 'entry_tick',           l: 'Entry Tick',        fmt: v => Math.round(v) },
+  { v: 'exit_tick',            l: 'Exit Tick',         fmt: v => Math.round(v) },
+  { v: 'entry_delta_long',     l: 'Entry ΔLong',       fmt: v => v.toFixed(2) },
+  { v: 'entry_delta_short',    l: 'Entry ΔShort',      fmt: v => v.toFixed(2) },
+  { v: 'entry_gap',            l: 'Entry Gap',         fmt: v => v.toFixed(1) },
+  { v: 'entry_gap_delta',      l: 'Entry ΔGap',        fmt: v => v.toFixed(2) },
+  { v: 'entry_btc',            l: 'Entry BTC',         fmt: v => '$' + Math.round(v).toLocaleString() },
+  { v: 'entry_ts',             l: 'Time of Day',       fmt: v => { const h = Math.floor(v); const m = Math.round((v - h) * 60); return h + ':' + String(m).padStart(2, '0'); } },
+  { v: 'entry_datetime',       l: 'Date-Time',         fmt: v => { const d = new Date(v); return (d.getUTCMonth()+1)+'/'+d.getUTCDate()+' '+d.getUTCHours()+':'+String(d.getUTCMinutes()).padStart(2,'0'); } },
+];
+
+async function initBacktest() {
+  const configs = await api('/api/configs');
+  const sel = $('bt-config');
+  if (!sel) return;
+  sel.innerHTML = configs.length
+    ? configs.map(c => `<option value="${c.id}"${c.active ? ' selected' : ''}>${c.name}${c.active ? ' ★' : ''}</option>`).join('')
+    : '<option value="">No configs yet</option>';
+}
+
+async function startBacktest() {
+  const configId = $('bt-config')?.value;
+  const count    = Math.max(1, Math.min(5000, parseInt($('bt-count')?.value) || 20));
+  if (!configId) return;
+
+  clearInterval(btPollTimer); btPollTimer = null;
+  btJob = null; btTrades = [];
+  if (btChart) { btChart.destroy(); btChart = null; }
+
+  $('bt-results').innerHTML = `
+    <div class="bt-progress-bar"><div class="bt-progress-fill" id="bt-fill" style="width:0%"></div></div>
+    <div id="bt-status" style="font-size:11px;color:var(--muted);margin-top:8px">Starting…</div>`;
+
+  const res  = await fetch('/api/backtest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ config_id: parseInt(configId), market_count: count, seed: $('bt-seed').value.trim() }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.job_id) {
+    $('bt-results').innerHTML = `<div class="empty" style="color:var(--red)">${data.error || 'Failed to start backtest'}</div>`;
+    return;
+  }
+  btJob = data.job_id;
+  btPollTimer = setInterval(pollBacktest, 700);
+}
+
+async function pollBacktest() {
+  if (!btJob) return;
+  try {
+    const data   = await api('/api/backtest/' + btJob);
+    const done   = data.progress?.done  ?? 0;
+    const total  = data.progress?.total ?? 1;
+    const pct    = Math.round(done / total * 100);
+    const fill   = $('bt-fill');
+    const status = $('bt-status');
+    if (fill)   fill.style.width   = pct + '%';
+    if (status) status.textContent = `Running… ${done} / ${total} markets (${pct}%)`;
+    if (data.seed) $('bt-seed').value = data.seed;
+    if (data.status === 'done') {
+      clearInterval(btPollTimer); btPollTimer = null;
+      renderBacktestResults(data);
+    } else if (data.status === 'error') {
+      clearInterval(btPollTimer); btPollTimer = null;
+      $('bt-results').innerHTML = `<div class="empty" style="color:var(--red)">Error: ${data.error || 'Unknown'}</div>`;
+    }
+  } catch (e) { console.warn('backtest poll:', e); }
+}
+
+function renderBacktestResults(data) {
+  btTrades = [];
+  for (const m of (data.markets || []))
+    for (const t of (m.trades || []))
+      btTrades.push({ ...t, market_ticker: m.market_ticker });
+  btTrades.sort((a, b) => (a.entry_ts || '').localeCompare(b.entry_ts || ''));
+  btTrades.forEach((t, i) => { t.trade_idx = i; });
+
+  const s = data.summary || {};
+  const TABLE_LIMIT = 1000;
+  const shown = btTrades.slice(0, TABLE_LIMIT);
+
+  if (data.seed) $('bt-seed').value = data.seed;
+
+  $('bt-results').innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+      <span style="font-size:10px;color:var(--muted);letter-spacing:1px">SEED</span>
+      <span style="font-size:11px;color:#aaa;background:#0d0d0d;border:1px solid #2a2a2a;
+        padding:3px 10px;border-radius:4px;font-family:monospace;cursor:pointer;user-select:all"
+        title="Click to copy"
+        onclick="navigator.clipboard.writeText(this.textContent).then(()=>{this.style.color='var(--green)';setTimeout(()=>this.style.color='',1000)})"
+        >${data.seed || '—'}</span>
+    </div>
+    <div class="cards" style="margin-bottom:20px">
+      <div class="card"><div class="card-label">Trades</div>
+        <div class="card-value blue">${s.total_trades ?? 0}</div></div>
+      <div class="card"><div class="card-label">Wins</div>
+        <div class="card-value green">${s.wins ?? 0}</div></div>
+      <div class="card"><div class="card-label">Losses</div>
+        <div class="card-value red">${s.losses ?? 0}</div></div>
+      <div class="card"><div class="card-label">Win Rate</div>
+        <div class="card-value ${(s.win_rate ?? 0) >= 50 ? 'green' : 'red'}">${s.win_rate ?? 0}%</div></div>
+      <div class="card"><div class="card-label">Total Return</div>
+        <div class="card-value ${(s.total_return ?? 0) >= 0 ? 'green' : 'red'}">${fmtPct(s.total_return)}</div></div>
+      <div class="card"><div class="card-label">Avg / Trade</div>
+        <div class="card-value ${(s.avg_return ?? 0) >= 0 ? 'green' : 'red'}">${fmtPct(s.avg_return)}</div></div>
+      <div class="card"><div class="card-label">Markets</div>
+        <div class="card-value">${s.markets_tested ?? 0}</div></div>
+      <div class="card"><div class="card-label">w/ Trades</div>
+        <div class="card-value">${s.markets_with_trades ?? 0}</div></div>
+    </div>
+
+    <div class="chart-box" style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+        <span class="chart-title" style="margin:0">Plot</span>
+        <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--muted)">X</span>
+          <select id="bt-x" onchange="rebuildBtChart()"
+            style="background:#0d0d0d;border:1px solid #2a2a2a;color:#ccc;font:inherit;font-size:11px;padding:3px 8px;border-radius:5px;outline:none;cursor:pointer">
+            ${BT_AXES.map(a => `<option value="${a.v}"${a.v==='trade_idx'?' selected':''}>${a.l}</option>`).join('')}
+          </select>
+          <span style="font-size:10px;color:var(--muted)">Y</span>
+          <select id="bt-y" onchange="rebuildBtChart()"
+            style="background:#0d0d0d;border:1px solid #2a2a2a;color:#ccc;font:inherit;font-size:11px;padding:3px 8px;border-radius:5px;outline:none;cursor:pointer">
+            ${BT_AXES.map(a => `<option value="${a.v}"${a.v==='return_pct'?' selected':''}>${a.l}</option>`).join('')}
+          </select>
+          <span style="font-size:10px;color:var(--muted)">Color</span>
+          <select id="bt-color" onchange="rebuildBtChart()"
+            style="background:#0d0d0d;border:1px solid #2a2a2a;color:#ccc;font:inherit;font-size:11px;padding:3px 8px;border-radius:5px;outline:none;cursor:pointer">
+            <option value="result">Result</option>
+            <option value="side">Side</option>
+            <option value="all">All (single)</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:300px"><canvas id="bt-chart-canvas"></canvas></div>
+    </div>
+
+    <div class="table-box">
+      <div class="table-header">Trades${btTrades.length > TABLE_LIMIT
+        ? ` (showing ${TABLE_LIMIT.toLocaleString()} of ${btTrades.length.toLocaleString()})`
+        : ` (${btTrades.length})`}</div>
+      <div style="max-height:440px;overflow-y:auto">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Market</th><th>Side</th><th>Result</th>
+            <th>Entry ¢</th><th>Exit ¢</th><th>Return</th>
+            <th>Score</th><th>Secs</th>
+          </tr></thead>
+          <tbody>${shown.map((t, i) => `
+            <tr>
+              <td style="color:var(--muted)">${i + 1}</td>
+              <td style="font-size:10px;color:var(--muted)">${tickerLabel(t.market_ticker)}</td>
+              <td><span class="pill ${t.side === 'Up' ? 'up' : 'down'}">${t.side}</span></td>
+              <td><span class="pill ${t.result}">${t.result}</span></td>
+              <td>${fmt1(t.entry_price)}¢</td>
+              <td>${fmt1(t.exit_price)}¢</td>
+              <td class="${retClass(t.return_pct)}">${fmtPct(t.return_pct)}</td>
+              <td>${fmt2(t.entry_score)}</td>
+              <td style="color:var(--muted)">${t.entry_secs_remaining != null ? t.entry_secs_remaining + 's' : '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  rebuildBtChart();
+}
+
+function rebuildBtChart() {
+  if (!btTrades.length) return;
+  const xKey    = $('bt-x')?.value     || 'trade_idx';
+  const yKey    = $('bt-y')?.value     || 'return_pct';
+  const colorBy = $('bt-color')?.value || 'result';
+  const yCum    = yKey === 'cumulative';
+  const xCum    = xKey === 'cumulative';
+
+  if (btChart) { btChart.destroy(); btChart = null; }
+
+  // Build running cumulative-return lookup if either axis needs it
+  let cumMap = null;
+  if (yCum || xCum) {
+    let sum = 0;
+    cumMap = new Map();
+    [...btTrades].sort((a, b) => a.trade_idx - b.trade_idx).forEach(t => {
+      sum += t.return_pct || 0;
+      cumMap.set(t.trade_idx, parseFloat(sum.toFixed(2)));
+    });
+  }
+
+  const getVal = (t, key) => {
+    if (key === 'cumulative') return cumMap?.get(t.trade_idx) ?? null;
+    if (key === 'entry_ts') {
+      const d = t.entry_ts ? new Date(t.entry_ts) : null;
+      return d && !isNaN(d) ? d.getUTCHours() + d.getUTCMinutes() / 60 + d.getUTCSeconds() / 3600 : null;
+    }
+    if (key === 'entry_datetime') {
+      const d = t.entry_ts ? new Date(t.entry_ts) : null;
+      return d && !isNaN(d) ? d.getTime() : null;
+    }
+    return t[key] ?? null;
+  };
+
+  const xMeta = BT_AXES.find(a => a.v === xKey) || BT_AXES[0];
+  const yMeta = BT_AXES.find(a => a.v === yKey) || BT_AXES[1];
+
+  const GROUPS = colorBy === 'result'
+    ? [['Win',  t => t.result === 'win',  '#22c55e'], ['Loss', t => t.result === 'loss', '#ef4444']]
+    : colorBy === 'side'
+    ? [['Up',   t => t.side === 'Up',     '#3b82f6'], ['Down', t => t.side === 'Down',   '#f59e0b']]
+    : [['All',  () => true,               '#a78bfa']];
+
+  let datasets;
+  if (yCum) {
+    // One equity curve per group, each accumulating only its own trades, sorted by trade_idx
+    const sortedAll = [...btTrades].sort((a, b) => a.trade_idx - b.trade_idx);
+    datasets = GROUPS.map(([label, filterFn, color]) => {
+      let cum = 0;
+      const points = sortedAll
+        .filter(t => filterFn(t) && getVal(t, xKey) != null)
+        .map(t => { cum += t.return_pct || 0; return { x: getVal(t, xKey), y: parseFloat(cum.toFixed(2)), trade: t }; });
+      return { label, data: points, type: 'line',
+        borderColor: color, backgroundColor: color + '18',
+        pointRadius: 2, borderWidth: 2, fill: false, tension: 0.2 };
+    });
+  } else {
+    datasets = GROUPS.map(([label, filterFn, color]) => ({
+      label,
+      data: btTrades
+        .filter(t => filterFn(t) && getVal(t, xKey) != null && getVal(t, yKey) != null)
+        .map(t => ({ x: getVal(t, xKey), y: getVal(t, yKey), trade: t })),
+      backgroundColor: color + '99', pointRadius: 5, borderWidth: 0,
+    }));
+  }
+
+  btChart = new Chart($('bt-chart-canvas').getContext('2d'), {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: true, labels: { color: '#666', boxWidth: 10, font: { size: 11 } } },
+        tooltip: {
+          ...tooltipStyle(),
+          callbacks: {
+            label: ctx => {
+              const t = ctx.raw?.trade;
+              if (!t) return `(${fmt2(ctx.raw.x)}, ${fmt2(ctx.raw.y)})`;
+              return [
+                tickerLabel(t.market_ticker),
+                `${t.side}  ${t.result}  ${fmtPct(t.return_pct)}`,
+                `Score: ${fmt2(t.entry_score)}  Entry: ${fmt1(t.entry_price)}¢  Secs: ${t.entry_secs_remaining ?? '—'}`,
+              ];
+            },
+          },
+        },
+      },
+      scales: {
+        x: { type: 'linear', grid: { color: '#141414' },
+          ticks: { color: '#555', callback: xMeta.fmt },
+          title: { display: true, text: xMeta.l, color: '#444', font: { size: 10 } } },
+        y: { grid: { color: '#141414' },
+          ticks: { color: '#555', callback: yMeta.fmt },
+          title: { display: true, text: yMeta.l, color: '#444', font: { size: 10 } } },
+      },
+    },
+  });
+}
+
+// ── Evolution ─────────────────────────────────────────────────
+let evoChart = null;
+let evoSimChart = null;
+let evoRefreshTimer = null;
+
+async function loadEvo() {
+  await refreshEvo();
+  if (!evoRefreshTimer) {
+    evoRefreshTimer = setInterval(() => {
+      if ($('page-evo').classList.contains('active')) refreshEvo();
+    }, 10000);
+  }
+}
+
+async function refreshEvo() {
+  try {
+    const [stats, pop, sim] = await Promise.all([
+      api('/api/evo/stats'),
+      api('/api/evo/population'),
+      api('/api/evo/sim-trades'),
+    ]);
+    renderEvo(stats, pop);
+    renderEvoSim(sim);
+  } catch(e) { console.warn('evo refresh:', e); }
+}
+
+function renderEvo(stats, pop) {
+  const ps      = stats.population || {};
+  const genLog  = stats.gen_log    || [];
+  const last    = genLog.length ? genLog[genLog.length - 1] : null;
+
+  $('evo-gen').textContent   = ps.current_gen ?? '—';
+  $('evo-pop').textContent   = ps.total       ?? '—';
+  $('evo-valid').textContent = ps.valid        ?? '—';
+
+  if (last) {
+    $('evo-best-fit').textContent = last.best_fitness != null ? last.best_fitness.toFixed(2) : '—';
+    $('evo-best-fit').className   = 'card-value ' + (last.best_fitness > 0 ? 'green' : 'red');
+    $('evo-best-n').textContent   = last.best_n   ?? '—';
+    $('evo-best-wr').textContent  = last.best_wr  != null ? last.best_wr.toFixed(1)  + '%' : '—';
+    $('evo-best-avg').textContent = last.best_avg != null ? fmtPct(last.best_avg) : '—';
+    $('evo-best-avg').className   = 'card-value ' + ((last.best_avg || 0) >= 0 ? 'green' : 'red');
+  }
+
+  // Champion strip
+  const champ = stats.champion;
+  const box   = $('evo-champion-box');
+  if (champ) {
+    box.style.display = '';
+    $('evo-champ-formula').textContent = champ.formula || '';
+    $('evo-champ-badge').innerHTML = champ.active
+      ? '<span class="active-badge">ACTIVE</span>'
+      : '<span style="font-size:9px;color:var(--muted);border:1px solid #2a2a2a;padding:1px 6px;border-radius:8px">inactive</span>';
+    const m = (champ.notes || '').match(/n=(\d+).*wr=([\d.]+).*avg=([+\-\d.]+).*rsi=(\d+)/);
+    $('evo-champ-stats').innerHTML = m
+      ? `n=${m[1]}  wr=${m[2]}%  avg=${m[3]}%  rsi=${m[4]}`
+      : (champ.notes ? champ.notes.slice(0, 80) : '');
+  } else {
+    box.style.display = 'none';
+  }
+
+  // Fitness over generations chart
+  if (evoChart) { evoChart.destroy(); evoChart = null; }
+  if (genLog.length) {
+    evoChart = makeChart('chart-evo-fitness', 'line', {
+      labels: genLog.map(r => r.generation),
+      datasets: [{
+        data: genLog.map(r => r.best_fitness),
+        borderColor: '#a78bfa', borderWidth: 1.5, pointRadius: 0,
+        fill: { target: 'origin', above: '#a78bfa18', below: '#ef444418' },
+      }],
+    }, {
+      scales: {
+        x: { grid: { color: '#141414' }, ticks: { color: '#555', callback: v => 'G' + v, maxTicksLimit: 12 } },
+        y: { grid: { color: '#141414' }, ticks: { color: '#555' } },
+      },
+    });
+  }
+
+  // Population table
+  const tbody = $('evo-pop-body');
+  if (!pop.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">No population yet — start the evolution daemon</td></tr>';
+    return;
+  }
+  tbody.innerHTML = pop.slice(0, 100).map((g, i) => {
+    const fitOk  = g.fitness != null && isFinite(g.fitness) && g.fitness > -1e30;
+    const fitCls = fitOk ? (g.fitness > 0 ? 'ret-pos' : 'ret-neg') : '';
+    const avgCls = (g.trades_avg || 0) >= 0 ? 'ret-pos' : 'ret-neg';
+    const formula = (g.formula || '').slice(0, 80);
+    return `<tr>
+      <td style="color:var(--muted);font-size:11px">${i + 1}</td>
+      <td class="${fitCls}">${fitOk ? g.fitness.toFixed(2) : '—'}</td>
+      <td>${g.trades_n ?? '—'}</td>
+      <td>${g.trades_wr  != null ? g.trades_wr.toFixed(1)  + '%' : '—'}</td>
+      <td class="${avgCls}">${g.trades_avg != null ? fmtPct(g.trades_avg) : '—'}</td>
+      <td style="color:var(--muted)">${g.generation ?? '—'}</td>
+      <td style="color:var(--muted)">${g.rsi_period ?? '—'}</td>
+      <td title="${(g.formula || '').replace(/"/g, '&quot;')}"
+          style="font-family:monospace;font-size:10px;color:#666;
+                 max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+      >${formula}${(g.formula || '').length > 80 ? '…' : ''}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderEvoSim(sim) {
+  const s = sim.summary || {};
+  const trades = sim.trades || [];
+
+  $('evo-sim-n').textContent     = s.n ?? '—';
+  $('evo-sim-wr').textContent    = s.n ? s.wr + '%'      : '—';
+  $('evo-sim-wr').className      = 'card-value ' + ((s.wr  || 0) >= 50 ? 'green' : 'red');
+  $('evo-sim-avg').textContent   = s.n ? fmtPct(s.avg_ret)   : '—';
+  $('evo-sim-avg').className     = 'card-value ' + ((s.avg_ret || 0) >= 0 ? 'green' : 'red');
+  $('evo-sim-total').textContent = s.n ? fmtPct(s.total_ret) : '—';
+  $('evo-sim-total').className   = 'card-value ' + ((s.total_ret || 0) >= 0 ? 'green' : 'red');
+  $('evo-sim-status').textContent = s.n
+    ? `${s.n} trade${s.n !== 1 ? 's' : ''} · each market used its champion-at-the-time`
+    : 'waiting for first champion promotion…';
+
+  // Trade history table — most recent first
+  const tbody = $('evo-sim-trades-body');
+  if (!trades.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No sim trades yet</td></tr>';
+  } else {
+    tbody.innerHTML = [...trades].reverse().map(t => `<tr>
+      <td style="color:var(--muted);font-size:10px">${tickerLabel(t.market_ticker)}</td>
+      <td><span class="pill ${t.side?.toLowerCase()}">${t.side ?? '—'}</span></td>
+      <td>${fmt1(t.entry_price)}¢</td>
+      <td>${fmt1(t.exit_price)}¢</td>
+      <td class="${retClass(t.return_pct)}">${fmtPct(t.return_pct)}</td>
+    </tr>`).join('');
+  }
+
+  if (evoSimChart) { evoSimChart.destroy(); evoSimChart = null; }
+  if (!trades.length) return;
+
+  let cum = 0;
+  const pts = trades.map((t, i) => {
+    cum += t.return_pct || 0;
+    return { x: i + 1, y: parseFloat(cum.toFixed(2)), t };
+  });
+
+  evoSimChart = new Chart($('chart-evo-sim').getContext('2d'), {
+    type: 'line',
+    data: {
+      datasets: [{
+        data: pts,
+        borderColor: '#22c55e',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: { target: 'origin', above: '#22c55e18', below: '#ef444418' },
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...tooltipStyle(),
+          callbacks: {
+            label: ctx => {
+              const t = ctx.raw.t;
+              return `${t.side} ${t.result}  ${fmtPct(t.return_pct)}  (cum ${fmtPct(ctx.raw.y)})`;
+            },
+            title: ctx => tickerLabel(ctx[0]?.raw?.t?.market_ticker),
+          },
+        },
+      },
+      scales: {
+        x: { type: 'linear', grid: { color: '#141414' },
+          ticks: { color: '#555', callback: v => '#' + v, maxTicksLimit: 8 } },
+        y: { grid: { color: '#141414' },
+          ticks: { color: '#555', callback: v => v.toFixed(0) + '%' } },
+      },
+    },
+  });
+}
+
+function goToEvoChampion() {
+  showTab('configs');
+  // Give configs tab time to load, then select Evo-Champion
+  setTimeout(async () => {
+    if (!allConfigs.length) await loadConfigs();
+    const c = allConfigs.find(x => x.name === 'Evo-Champion');
+    if (c) editConfig(c.id);
+  }, 150);
+}
+
+// ── Evo reset ─────────────────────────────────────────────────
+let evoResetPoll = null;
+
+async function startEvoReset() {
+  if (!confirm('Clear all evolution history and re-run the walk-forward from scratch (~15 min)?\n\nThe daemon will be restarted automatically when complete.')) return;
+  const r = await fetch('/api/evo/reset', { method: 'POST' });
+  const d = await r.json();
+  if (!d.ok) { alert(d.error || 'Reset failed'); return; }
+  $('evo-reset-modal').style.display = 'flex';
+  $('evo-reset-log').textContent = '';
+  $('evo-reset-close').disabled = true;
+  $('evo-reset-close').style.opacity = '0.4';
+  $('evo-reset-badge').textContent = 'running…';
+  $('evo-reset-badge').style.background = '#1e293b';
+  $('evo-reset-badge').style.color = '#94a3b8';
+  evoResetPoll = setInterval(pollEvoReset, 1500);
+}
+
+async function pollEvoReset() {
+  try {
+    const d = await fetch('/api/evo/reset-status').then(r => r.json());
+    const el = $('evo-reset-log');
+    el.textContent = d.lines.join('\n');
+    el.scrollTop = el.scrollHeight;
+    if (d.status === 'done' || d.status === 'error') {
+      clearInterval(evoResetPoll); evoResetPoll = null;
+      $('evo-reset-close').disabled = false;
+      $('evo-reset-close').style.opacity = '1';
+      const ok = d.status === 'done';
+      $('evo-reset-badge').textContent = ok ? 'complete' : 'error';
+      $('evo-reset-badge').style.background = ok ? '#14532d' : '#7f1d1d';
+      $('evo-reset-badge').style.color = ok ? '#86efac' : '#fca5a5';
+    }
+  } catch(e) {}
+}
+
+function closeEvoReset() {
+  clearInterval(evoResetPoll); evoResetPoll = null;
+  $('evo-reset-modal').style.display = 'none';
+  refreshEvo();
+}
+
+// ── Init ──────────────────────────────────────────────────────
+loadStats();
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Tool artifacts
+.claude/
+.playwright-mcp/
+
+# Database
+server/crow.db
+
+# Secrets / machine-specific
+server/crow.key
+
+# Logs
+*.log
+server/evolve.log
+server/walkforward_replay.log
+server/walkforward_replay_err.log
+server/server_rsi.log
+server/server_rsi_err.log
+
+# Runtime state
+server/evolve.pid
+server/overnight_rd_state.json
+
+# Experiment output
+server/wf_exp*.txt
+server/walkforward_performance.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Analysis outputs
+analysis/*.png

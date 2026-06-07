@@ -1,0 +1,16 @@
+# Cloudflare Tunnel config — crow.sinceremickey.com
+#
+# One-time setup:
+#   cloudflared tunnel login
+#   cloudflared tunnel create crow
+#   cloudflared tunnel route dns crow crow.sinceremickey.com
+#   cloudflared tunnel list        <-- copy the UUID shown for "crow"
+#   Then replace TUNNEL-ID-HERE below with that UUID.
+
+tunnel: 94885393-00ac-434c-9072-99992b7f91a5
+# credentials-file is auto-discovered from ~/.cloudflared/ on both Windows and Linux
+
+ingress:
+  - hostname: crow.sinceremickey.com
+    service: http://localhost:7429
+  - service: http_status:404

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Kalshi BTC Score",
+  "version": "1.0",
+  "description": "Momentum score overlay for Kalshi 15-min BTC UP/DOWN markets",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://kalshi.com/markets/kxbtc15m/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://kalshi-public-docs.s3.amazonaws.com/*",
+    "https://api.elections.kalshi.com/*",
+    "https://trading-api.kalshi.com/*",
+    "https://external-api.kalshi.com/*",
+    "http://localhost:7429/*"
+  ]
+}
