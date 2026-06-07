@@ -9,7 +9,7 @@ import time
 import uuid
 import random
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from flask import (Flask, request, jsonify, send_from_directory,
                    session, redirect, render_template_string)
 
@@ -1173,13 +1173,15 @@ def api_evo_population():
 @app.route('/api/evo/sim-trades')
 @login_required
 def api_evo_sim_trades():
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     db = get_db()
     trades = db.execute('''
         SELECT market_ticker, side, result, entry_price, exit_price,
                return_pct, entry_secs, entry_score
         FROM evo_sim_trades
+        WHERE ts >= ?
         ORDER BY market_ticker ASC
-    ''').fetchall()
+    ''', [cutoff]).fetchall()
     db.close()
     t_list = [dict(t) for t in trades]
     n = len(t_list)

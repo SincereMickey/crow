@@ -431,7 +431,7 @@ tr:hover td { background: #141414; }
   <div class="chart-box" id="evo-sim-box" style="margin-bottom:20px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <div style="font-size:10px;color:var(--muted);letter-spacing:1px">PAPER SIM</div>
-      <div id="evo-sim-status" style="font-size:10px;color:var(--muted)">each market traded by whoever was champion when it ended</div>
+      <div id="evo-sim-status" style="font-size:10px;color:var(--muted)">past 24 h · each market traded by whoever was champion when it ended</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:14px">
       <div class="card"><div class="card-label">Trades</div><div class="card-value blue" id="evo-sim-n">—</div></div>
@@ -1594,8 +1594,8 @@ function renderEvoSim(sim) {
   $('evo-sim-total').textContent = s.n ? fmtPct(s.total_ret) : '—';
   $('evo-sim-total').className   = 'card-value ' + ((s.total_ret || 0) >= 0 ? 'green' : 'red');
   $('evo-sim-status').textContent = s.n
-    ? `${s.n} trade${s.n !== 1 ? 's' : ''} · each market used its champion-at-the-time`
-    : 'waiting for first champion promotion…';
+    ? `${s.n} trade${s.n !== 1 ? 's' : ''} · past 24 h · each market used its champion-at-the-time`
+    : 'waiting for first champion promotion… (past 24 h)';
 
   // Trade history table — most recent first
   const tbody = $('evo-sim-trades-body');
