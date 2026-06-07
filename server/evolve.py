@@ -23,7 +23,7 @@ MIGRATION_COUNT    = 2       # top-N migrants per island per exchange
 ELITE_COUNT        = 3       # elite survivors per island (× N_ISLANDS total)
 CULL_FRACTION      = 0.7     # remove bottom 70% each generation
 MARKET_SAMPLE      = 30      # use the most recent N completed markets
-MIN_TRADES         = 20      # minimum trades for valid fitness
+MIN_TRADES         = 15      # minimum trades for valid fitness
 SIZE_BUDGET        = 20      # formula nodes before parsimony penalty kicks in
 SIZE_PENALTY       = 0.01    # fitness multiplier reduction per node over budget
 FORMULA_MAX_DEPTH  = 5
@@ -91,9 +91,11 @@ class UnaryNode(Node):
 _SAFE = {'__builtins__': {}, 'abs': abs, 'max': max, 'min': min,
          'round': round, 'floor': math.floor, 'ceil': math.ceil}
 
+SIGNAL_VARS = ['deltaLong', 'deltaShort', 'gapDelta']  # must have at least one
+
 def _is_degenerate(formula):
-    """True if formula references no tick variables — score is constant, no signals possible."""
-    return not any(v in formula for v in VARS)
+    """True if formula has no real momentum signal (deltaLong/deltaShort/gapDelta)."""
+    return not any(v in formula for v in SIGNAL_VARS)
 
 def _kalshi_fee(contracts, price_frac):
     """Taker fee in dollars: ceil(0.07 × C × P × (1-P))"""
@@ -858,7 +860,7 @@ def _make_seed(tree_fn, rng):
         exit_threshold = rng.choice([0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 50.0]),
         short_lookback = rng.choice([10, 12, 15, 18, 20, 25]),
         rsi_period     = rng.choice([28, 42, 60]),
-        regime_type    = rng.choice(['none', 'extreme', 'extreme']),
+        regime_type    = rng.choice(['none', 'none', 'none', 'extreme']),
         regime_lo      = rng.uniform(28, 42),
         regime_hi      = rng.uniform(58, 75),
         min_entry      = rng.uniform(1, 20),
@@ -898,7 +900,6 @@ def _evolve_island(island, tick_cache, markets, rng, gen):
     keep_n    = max(ELITE_COUNT, int(len(valid) * (1 - CULL_FRACTION)))
     survivors = valid[:keep_n]
     culled    = valid[keep_n:] + non_valid
-    _mark_culled([g.db_id for g in culled if g.db_id])
 
     pool = survivors[:max(3, len(survivors) // 2)]
     n_new = ISLAND_SIZE - len(survivors)
@@ -916,9 +917,11 @@ def _evolve_island(island, tick_cache, markets, rng, gen):
         child.generation = gen
         new_genomes.append(child)
 
+    # Save children before culling so a mid-generation kill leaves alive rows in DB
     for g in new_genomes:
         try: _save_genome(g, gen)
         except: pass
+    _mark_culled([g.db_id for g in culled if g.db_id])
 
     return survivors + new_genomes, valid[0] if valid else None, len(valid)
 
