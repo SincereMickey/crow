@@ -76,11 +76,12 @@ def breed(survivors, rng, gen):
     return children
 
 def evolve_step(population, tick_cache, window_markets, rng):
-    """Run N_GENS of evolution. Returns (champion, updated_population)."""
+    """Run N_GENS of evolution. Returns (champion, updated_population, final_survivors)."""
     for g in population:
         g.fitness = None
 
     best = None
+    final_survivors = []
     with multiprocessing.Pool(processes=WORKERS) as pool:
         for gen in range(1, N_GENS + 1):
             population = eval_population(pool, population, tick_cache, window_markets)
@@ -90,9 +91,10 @@ def evolve_step(population, tick_cache, window_markets, rng):
                 best = copy.deepcopy(valid[0])
             keep_n    = max(ELITE_COUNT, int(len(valid) * (1 - CULL_FRACTION)))
             survivors = valid[:keep_n]
+            final_survivors = [copy.deepcopy(g) for g in survivors]
             population = survivors + breed(survivors, rng, gen)
 
-    return best, population
+    return best, population, final_survivors
 
 def simulate_returns(ticker_list, tick_cache, cfg):
     returns = []
@@ -149,7 +151,7 @@ def main():
             exit_threshold = rng.choice([0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 50.0]),
             short_lookback = rng.choice([10, 12, 15, 18, 20, 25]),
             rsi_period     = rng.choice([28, 42, 60]),
-            regime_type    = rng.choice(['none', 'extreme', 'extreme']),
+            regime_type    = rng.choice(['none', 'none', 'none', 'extreme']),
             regime_lo      = rng.uniform(28, 42),
             regime_hi      = rng.uniform(58, 75),
             min_entry      = rng.uniform(1, 20),
@@ -165,6 +167,7 @@ def main():
     evo_all_returns    = []
     crow154_all_returns = []
     step_log           = []
+    seed_pool          = []   # accumulates evaluated genomes for daemon seeding
 
     hdr = (f'{"Step":>4}  {"OOS markets":>11}  '
            f'{"Fit n":>5}  {"Fit avg":>8}  {"Fit WR":>6}  '
@@ -183,8 +186,9 @@ def main():
         window_cache = {t: all_ticks[t] for t in window_mkts}
 
         t0 = time.time()
-        champ, population = evolve_step(population, window_cache, window_mkts, rng)
+        champ, population, survivors = evolve_step(population, window_cache, window_mkts, rng)
         elapsed = time.time() - t0
+        seed_pool.extend(survivors)
 
         # Log champion to history so the live sim knows who was active for these markets
         save_champion_history(champ, oos_mkts, market_start_ts)
@@ -255,7 +259,7 @@ def main():
         print(f'  Steps with OOS trades: {steps_with_trades}/{len(step_log)}  '
               f'profitable steps: {steps_profitable}')
 
-    save_final_population(population, step_num)
+    save_final_population(seed_pool, step_num)
 
 def save_champion_history(champion, oos_mkts, market_start_ts):
     """Log the step champion to evo_champion_history with promoted_at = start of first OOS market."""
@@ -279,19 +283,28 @@ def save_champion_history(champion, oos_mkts, market_start_ts):
     db.commit(); db.close()
 
 
-def save_final_population(population, step_num):
-    """Persist the final walk-forward population to evo_population for daemon seeding."""
+def save_final_population(seed_pool, step_num):
+    """Persist the best evolved genomes to evo_population for daemon seeding.
+
+    seed_pool is the accumulated survivors from every walk-forward step — all
+    have been evaluated at least once, so fitness is finite.  We sort by
+    fitness and keep the top 200 to give the daemon a strong starting gene pool.
+    """
     _ensure_table()
+    valid = [g for g in seed_pool
+             if g.fitness is not None and math.isfinite(g.fitness)]
+    valid.sort(key=lambda g: g.fitness, reverse=True)
+    top = valid[:200]
     saved = 0
-    for g in population:
-        if g.fitness is not None and math.isfinite(g.fitness or float('-inf')):
-            try:
-                g.db_id = None  # force INSERT
-                _save_genome(g, step_num)
-                saved += 1
-            except Exception as e:
-                print(f'  save error: {e}')
-    print(f'Saved {saved}/{len(population)} genomes to evo_population for daemon seeding.')
+    for g in top:
+        try:
+            g.db_id = None  # force INSERT
+            _save_genome(g, step_num)
+            saved += 1
+        except Exception as e:
+            print(f'  save error: {e}')
+    print(f'Saved {saved}/{len(top)} top genomes to evo_population for daemon seeding '
+          f'(pool had {len(valid)} evaluated genomes).')
 
 
 if __name__ == '__main__':
