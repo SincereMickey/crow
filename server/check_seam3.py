@@ -55,7 +55,7 @@ print('=== Real sim entry prices (Crow-3, threshold search) ===')
 rows = db.execute('''
     SELECT market_ticker, MIN(ts) as open_ts, MAX(ts) as close_ts, COUNT(*) as ticks
     FROM ticks GROUP BY market_ticker
-    HAVING ticks >= 750
+    HAVING ticks >= 500
     ORDER BY open_ts
 ''').fetchall()
 old_markets = [r[0] for r in rows if r[1] < '2026-06-01']

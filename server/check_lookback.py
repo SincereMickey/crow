@@ -18,7 +18,7 @@ new_markets = db.execute('''
     FROM ticks
     WHERE ts >= '2026-06-01'
     GROUP BY market_ticker
-    HAVING ticks >= 750 AND has_series > 500
+    HAVING ticks >= 500 AND has_series > 400
     ORDER BY MIN(ts)
 ''').fetchall()
 print(f'\nNew markets with series: {len(new_markets)}')

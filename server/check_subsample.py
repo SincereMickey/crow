@@ -127,8 +127,8 @@ def report(label, all_returns):
 random.seed(42)
 
 for period, cond, min_ticks in [
-    ('OLD',  "ts < '2026-06-01'",  750),
-    ('NEW',  "ts >= '2026-06-01'", 750),
+    ('OLD',  "ts < '2026-06-01'",  500),
+    ('NEW',  "ts >= '2026-06-01'", 500),
 ]:
     mkt_rows = db.execute(f'''
         SELECT market_ticker FROM ticks WHERE {cond}

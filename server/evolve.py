@@ -7,6 +7,7 @@ Best genome auto-promotes to live trading slot.
 """
 
 import sqlite3, json, math, random, time, copy, logging, sys, os, urllib.request
+import ast as _pyast
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Optional, List
@@ -22,7 +23,7 @@ MIGRATION_COUNT    = 2       # top-N migrants per island per exchange
 ELITE_COUNT        = 3       # elite survivors per island (× N_ISLANDS total)
 CULL_FRACTION      = 0.7     # remove bottom 70% each generation
 MARKET_SAMPLE      = 30      # use the most recent N completed markets
-MIN_TRADES         = 12      # minimum trades for valid fitness
+MIN_TRADES         = 20      # minimum trades for valid fitness
 SIZE_BUDGET        = 20      # formula nodes before parsimony penalty kicks in
 SIZE_PENALTY       = 0.01    # fitness multiplier reduction per node over budget
 FORMULA_MAX_DEPTH  = 5
@@ -39,7 +40,7 @@ PID_FILE          = 'evolve.pid'
 EVO_CHAMPION_NAME = 'Evo-Champion'
 
 VARS = ['deltaLong', 'deltaShort', 'gapDelta', 'secsRemaining',
-        'lookback', 'gap', 'rsi', 'up', 'down']
+        'lookback', 'gap', 'rsi']
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
@@ -608,22 +609,74 @@ def _load_population():
             generation     = r['generation'],
             db_id          = r['id'],
         )
-        # Restore formula as a passthrough string node
-        g.tree = _FormulaStrNode(r['formula'])
+        g.tree = _parse_formula(r['formula'])
         pop.append(g)
     return pop
 
 class _FormulaStrNode(Node):
-    """Wraps a raw formula string so restored genomes can still mutate."""
+    """Fallback for formula strings that fail to parse. Evaluates correctly but can't mutate."""
     def __init__(self, s): self.s = s
     def to_str(self):      return self.s
     def size(self):        return 10  # approximate
+
+def _unwrap_abs_guard(node):
+    """BinNode('/') serialises denominator as (abs(r) + 0.01). Unwrap back to r."""
+    if isinstance(node, _pyast.BinOp) and isinstance(node.op, _pyast.Add):
+        lhs, rhs = node.left, node.right
+        if (isinstance(lhs, _pyast.Call) and
+                isinstance(lhs.func, _pyast.Name) and lhs.func.id == 'abs' and
+                len(lhs.args) == 1):
+            cv = None
+            if isinstance(rhs, _pyast.Constant) and isinstance(rhs.value, (int, float)):
+                cv = rhs.value
+            elif hasattr(_pyast, 'Num') and isinstance(rhs, _pyast.Num):
+                cv = rhs.n
+            if cv is not None and abs(cv - 0.01) < 1e-6:
+                return _ast_to_node(lhs.args[0])
+    return _ast_to_node(node)
+
+def _ast_to_node(node):
+    """Recursively map a Python AST node back to our Node tree."""
+    if isinstance(node, _pyast.BinOp):
+        left = _ast_to_node(node.left)
+        if isinstance(node.op, _pyast.Add):  return BinNode('+', left, _ast_to_node(node.right))
+        if isinstance(node.op, _pyast.Sub):  return BinNode('-', left, _ast_to_node(node.right))
+        if isinstance(node.op, _pyast.Mult): return BinNode('*', left, _ast_to_node(node.right))
+        if isinstance(node.op, _pyast.Div):  return BinNode('/', left, _unwrap_abs_guard(node.right))
+    if isinstance(node, _pyast.UnaryOp):
+        if isinstance(node.op, _pyast.USub):
+            op = node.operand
+            if isinstance(op, _pyast.Constant) and isinstance(op.value, (int, float)):
+                return ConstNode(-op.value)
+            return UnaryNode('neg', _ast_to_node(op))
+        if isinstance(node.op, _pyast.UAdd):
+            return _ast_to_node(node.operand)
+    if isinstance(node, _pyast.Call):
+        fn = node.func
+        if isinstance(fn, _pyast.Name) and fn.id == 'abs' and len(node.args) == 1:
+            return UnaryNode('abs', _ast_to_node(node.args[0]))
+    if isinstance(node, _pyast.Name):
+        if node.id in VARS: return VarNode(node.id)
+        if node.id == 'tuner': return ConstNode(1.0)
+    if isinstance(node, _pyast.Constant) and isinstance(node.value, (int, float)):
+        return ConstNode(float(node.value))
+    if hasattr(_pyast, 'Num') and isinstance(node, _pyast.Num):
+        return ConstNode(float(node.n))
+    try:    return _FormulaStrNode(_pyast.unparse(node))
+    except: return ConstNode(0.0)
+
+def _parse_formula(formula_str):
+    """Parse a stored formula string back into a mutable Node tree."""
+    try:
+        return _ast_to_node(_pyast.parse(formula_str, mode='eval').body)
+    except Exception:
+        return _FormulaStrNode(formula_str)
 
 def _get_markets(db):
     rows = db.execute('''
         SELECT market_ticker FROM ticks
         GROUP BY market_ticker
-        HAVING COUNT(*) >= 750 AND MIN(secs_remaining) = 0
+        HAVING COUNT(*) >= 500 AND MIN(secs_remaining) = 0
         ORDER BY MAX(ts) DESC
         LIMIT ?
     ''', [MARKET_SAMPLE]).fetchall()
@@ -798,24 +851,29 @@ def _log_generation(gen, best, valid_count, pop_size):
 
 # ── Main evolution loop (island model) ───────────────────────────────────────
 
+def _make_seed(tree_fn, rng):
+    return Genome(
+        tree           = tree_fn(),
+        threshold      = rng.choice([0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 50.0]),
+        exit_threshold = rng.choice([0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 50.0]),
+        short_lookback = rng.choice([10, 12, 15, 18, 20, 25]),
+        rsi_period     = rng.choice([28, 42, 60]),
+        regime_type    = rng.choice(['none', 'extreme', 'extreme']),
+        regime_lo      = rng.uniform(28, 42),
+        regime_hi      = rng.uniform(58, 75),
+        min_entry      = rng.uniform(1, 20),
+        max_entry      = rng.uniform(25, 49),
+        cooldown       = rng.choice([0, 0, 15, 30]),
+        exit_cooldown  = rng.choice([0, 0, 15, 30]),
+    )
+
 def _seed_island(existing, target_size, rng):
-    """Fill an island up to target_size with Crow-3 variants then random genomes."""
+    """Fill an island up to target_size with Crow-3/Crow-A seeds then random genomes."""
     island = list(existing)
-    for _ in range(min(3, target_size - len(island))):
-        island.append(Genome(
-            tree           = _crow3_tree(),
-            threshold      = rng.choice([0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 50.0]),
-            exit_threshold = rng.choice([0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 50.0]),
-            short_lookback = rng.choice([10, 12, 15, 18, 20, 25]),
-            rsi_period     = rng.choice([28, 42, 60]),
-            regime_type    = rng.choice(['none', 'extreme', 'extreme']),
-            regime_lo      = rng.uniform(28, 42),
-            regime_hi      = rng.uniform(58, 75),
-            min_entry      = rng.uniform(1, 20),
-            max_entry      = rng.uniform(25, 49),
-            cooldown       = rng.choice([0, 0, 15, 30]),
-            exit_cooldown  = rng.choice([0, 0, 15, 30]),
-        ))
+    seed_fns = [_crow3_tree, _crow_a_tree, _crow3_tree, _crow_a_tree]
+    for fn in seed_fns:
+        if len(island) >= target_size: break
+        island.append(_make_seed(fn, rng))
     while len(island) < target_size:
         island.append(_random_genome(rng))
     return island

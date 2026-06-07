@@ -46,7 +46,7 @@ def get_all_markets(db):
     rows = db.execute('''
         SELECT market_ticker FROM ticks
         GROUP BY market_ticker
-        HAVING COUNT(*) >= 750 AND MIN(secs_remaining) = 0
+        HAVING COUNT(*) >= 500 AND MIN(secs_remaining) = 0
         ORDER BY MAX(ts) ASC
     ''').fetchall()
     return [r[0] for r in rows]

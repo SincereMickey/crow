@@ -205,7 +205,7 @@ def init_db():
             SELECT market_ticker FROM ticks
             WHERE market_ticker IS NOT NULL
             GROUP BY market_ticker
-            HAVING COUNT(*) < 750
+            HAVING COUNT(*) < 500
         )
     ''')
     db.commit()
@@ -425,7 +425,7 @@ def api_markets():
         FROM ticks
         WHERE market_ticker IS NOT NULL
         GROUP BY market_ticker
-        HAVING MIN(secs_remaining) = 0 AND COUNT(*) >= 750
+        HAVING MIN(secs_remaining) = 0 AND COUNT(*) >= 500
         ORDER BY first_tick DESC
     ''').fetchall()
     trade_stats = {r['market_ticker']: dict(r) for r in db.execute('''
@@ -891,7 +891,7 @@ def api_backtest_start():
     market_rows = db.execute('''
         SELECT market_ticker FROM ticks WHERE market_ticker IS NOT NULL
         GROUP BY market_ticker
-        HAVING MIN(secs_remaining) = 0 AND COUNT(*) >= 750
+        HAVING MIN(secs_remaining) = 0 AND COUNT(*) >= 500
           AND MAX(ts) < ?
     ''', [cutoff_iso]).fetchall()
     db.close()
@@ -1065,7 +1065,7 @@ def _run_evo_sim():
             SELECT market_ticker, MAX(ts) AS end_ts
             FROM ticks
             GROUP BY market_ticker
-            HAVING COUNT(*) >= 750 AND MIN(secs_remaining) = 0
+            HAVING COUNT(*) >= 500 AND MIN(secs_remaining) = 0
             ORDER BY end_ts ASC
         ''').fetchall()
 
